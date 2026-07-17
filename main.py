@@ -15,7 +15,7 @@ from aiohttp import web
 
 from app import admin, handlers
 from app.config import config
-from app.storage import Storage
+from app.storage import BotStorage, create_storage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,7 +28,7 @@ ALLOWED_UPDATES = ["message", "callback_query", "my_chat_member"]
 MAX_BODY_SIZE = 1024 * 1024  # 1 МБ
 
 
-async def daily_maintenance(storage: Storage) -> None:
+async def daily_maintenance(storage: BotStorage) -> None:
     while True:
         await asyncio.sleep(86400)
         try:
@@ -52,7 +52,7 @@ async def health(request: web.Request) -> web.Response:
         return web.json_response({"status": "error"}, status=503)
 
 
-def build_dispatcher(storage: Storage) -> Dispatcher:
+def build_dispatcher(storage: BotStorage) -> Dispatcher:
     # Ключ workflow_data "storage" внедряется в хендлеры по имени аргумента.
     # Нельзя передавать storage= в конструктор: этот параметр зарезервирован под FSM.
     dp = Dispatcher()
@@ -62,14 +62,14 @@ def build_dispatcher(storage: Storage) -> Dispatcher:
     return dp
 
 
-async def run_polling(bot: Bot, dp: Dispatcher, storage: Storage) -> None:
+async def run_polling(bot: Bot, dp: Dispatcher, storage: BotStorage) -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     log.info("Starting in POLLING mode (dev only)")
     asyncio.create_task(daily_maintenance(storage))
     await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
 
 
-async def run_webhook(bot: Bot, dp: Dispatcher, storage: Storage) -> None:
+async def run_webhook(bot: Bot, dp: Dispatcher, storage: BotStorage) -> None:
     assert config.webhook_base_url and config.webhook_secret and config.webhook_path_secret, \
         "WEBHOOK_BASE_URL, WEBHOOK_SECRET и WEBHOOK_PATH_SECRET обязательны в режиме webhook"
 
@@ -99,7 +99,8 @@ async def run_webhook(bot: Bot, dp: Dispatcher, storage: Storage) -> None:
 
 
 async def main() -> None:
-    storage = Storage(config.db_path)
+    # Postgres (DATABASE_URL, общая БД с сайтом и будущей CRM) или SQLite локально
+    storage = create_storage()
     await storage.connect()
 
     bot = Bot(token=config.bot_token, default=DefaultBotProperties())

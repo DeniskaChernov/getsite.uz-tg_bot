@@ -47,7 +47,9 @@ def test_polish():
 def test_no_em_dash_in_templates():
     for d in (texts.START_NO_PAYLOAD, texts.CONTACT_REPLY, texts.MEDIA_REPLY,
               texts.LLM_FALLBACK_REPLY, texts.HELP_REPLY, texts.LEAD_CONFIRM_USER,
-              texts.FORGET_CONFIRM_USER, texts.RATE_LIMIT_REPLY):
+              texts.FORGET_CONFIRM_USER, texts.RATE_LIMIT_REPLY,
+              texts.ASK_NAME, texts.ASK_PHONE, texts.REG_DONE_PREFIX,
+              texts.WELCOME_BACK, texts.NAME_TOO_LONG):
         for lang, s in d.items():
             assert "—" not in s and "–" not in s, f"em dash in template [{lang}]: {s[:40]}"
     for lang in ("ru", "uz", "en"):
@@ -67,9 +69,10 @@ def test_texts():
 
 
 def test_prompt():
-    p = build_system_prompt("Лендинг", "ru", "ниша: кафе")
-    assert "Лендинг" in p and "ниша: кафе" in p
-    assert "{" not in p.replace("×2", "")  # все плейсхолдеры подставлены
+    p = build_system_prompt("Лендинг", "ru", "ниша: кафе", "Алишер")
+    assert "Лендинг" in p and "ниша: кафе" in p and "Алишер" in p
+    assert 'на "вы"' in p
+    assert "{" not in p  # все плейсхолдеры подставлены
 
 
 def test_brief_state():
@@ -87,6 +90,14 @@ async def test_storage():
     await s.upsert_user(42, "testuser", "Test", "ru", "sites_landing")
     user = await s.get_user(42)
     assert user["payload"] == "sites_landing"
+    # регистрация: язык → имя → телефон
+    assert user["reg_state"] == "need_lang"
+    await s.set_reg_state(42, "need_name")
+    await s.set_name(42, "Алишер")
+    await s.set_phone(42, "+998901234567")
+    await s.set_reg_state(42, "done")
+    user = await s.get_user(42)
+    assert user["name"] == "Алишер" and user["phone"] == "+998901234567" and user["reg_state"] == "done"
     await s.add_message(42, "user", "привет")
     await s.add_message(42, "assistant", "здравствуйте")
     assert len(await s.history(42)) == 2

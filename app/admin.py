@@ -1,4 +1,4 @@
-"""Админ-команды и кнопки карточек лидов. Доступ — только по user_id из allowlist."""
+﻿"""Админ-команды и кнопки карточек лидов. Доступ - только по user_id из allowlist."""
 from __future__ import annotations
 
 import logging
@@ -9,7 +9,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message
 
 from app.config import config
-from app.storage import Storage
+from app.storage import BotStorage
 
 log = logging.getLogger(__name__)
 router = Router()
@@ -20,7 +20,7 @@ def _is_admin(user_id: int) -> bool:
 
 
 @router.message(Command("leads"))
-async def cmd_leads(message: Message, storage: Storage):
+async def cmd_leads(message: Message, storage: BotStorage):
     if not _is_admin(message.from_user.id):
         return
     leads = await storage.recent_leads(10)
@@ -30,23 +30,24 @@ async def cmd_leads(message: Message, storage: Storage):
     lines = []
     for lead in leads:
         ts = datetime.fromtimestamp(lead["created_at"], tz=timezone.utc).strftime("%d.%m %H:%M")
-        lines.append(f"#{lead['id']} [{lead['status']}] {ts} — id {lead['user_id']}, "
-                     f"payload {lead['payload'] or '—'}: {lead['summary'][:100]}")
+        lines.append(f"#{lead['id']} [{lead['status']}] {ts} - id {lead['user_id']}, "
+                     f"payload {lead['payload'] or '-'}: {lead['summary'][:100]}")
     await message.answer("\n".join(lines))
 
 
 @router.message(Command("stats"))
-async def cmd_stats(message: Message, storage: Storage):
+async def cmd_stats(message: Message, storage: BotStorage):
     if not _is_admin(message.from_user.id):
         return
     s = await storage.stats(7)
     events = s["events"]
     starts = sum(s["starts_by_payload"].values())
     by_payload = "\n".join(f"  {p}: {c}" for p, c in
-                           sorted(s["starts_by_payload"].items(), key=lambda x: -x[1])) or "  —"
+                           sorted(s["starts_by_payload"].items(), key=lambda x: -x[1])) or "  -"
     await message.answer(
         f"📊 За 7 дней:\n"
         f"Стартов: {starts}\n{by_payload}\n"
+        f"Регистраций: {events.get('registered', 0)}\n"
         f"Брифов собрано: {events.get('brief_done', 0)}\n"
         f"Лидов передано: {s['leads']}\n"
         f"Ошибок LLM: {events.get('llm_error', 0)}\n"
@@ -55,7 +56,7 @@ async def cmd_stats(message: Message, storage: Storage):
 
 
 @router.message(Command("forget"))
-async def cmd_forget(message: Message, command: CommandObject, storage: Storage):
+async def cmd_forget(message: Message, command: CommandObject, storage: BotStorage):
     if not _is_admin(message.from_user.id):
         return
     if not command.args or not command.args.strip().isdigit():
@@ -68,7 +69,7 @@ async def cmd_forget(message: Message, command: CommandObject, storage: Storage)
 
 
 @router.message(Command("mute"))
-async def cmd_mute(message: Message, command: CommandObject, storage: Storage):
+async def cmd_mute(message: Message, command: CommandObject, storage: BotStorage):
     if not _is_admin(message.from_user.id):
         return
     args = (command.args or "").split()
@@ -84,7 +85,7 @@ async def cmd_mute(message: Message, command: CommandObject, storage: Storage):
 # --- кнопки под карточкой лида ---
 
 @router.callback_query(F.data.startswith("lead_take:"))
-async def cb_lead_take(query: CallbackQuery, storage: Storage):
+async def cb_lead_take(query: CallbackQuery, storage: BotStorage):
     if not _is_admin(query.from_user.id):
         await query.answer("Нет доступа", show_alert=True)
         return
@@ -96,7 +97,7 @@ async def cb_lead_take(query: CallbackQuery, storage: Storage):
 
 
 @router.callback_query(F.data.startswith("lead_spam:"))
-async def cb_lead_spam(query: CallbackQuery, storage: Storage):
+async def cb_lead_spam(query: CallbackQuery, storage: BotStorage):
     if not _is_admin(query.from_user.id):
         await query.answer("Нет доступа", show_alert=True)
         return

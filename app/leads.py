@@ -10,16 +10,16 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.config import config
 from app.services import resolve_payload
-from app.storage import Storage
+from app.storage import BotStorage
 
 log = logging.getLogger(__name__)
 
 
 def _esc(value: str | None) -> str:
-    return html.escape(value or "—")
+    return html.escape(str(value) if value else "-")
 
 
-async def send_lead(bot: Bot, storage: Storage, user_id: int) -> int | None:
+async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     user = await storage.get_user(user_id)
     if not user:
         return None
@@ -40,8 +40,9 @@ async def send_lead(bot: Bot, storage: Storage, user_id: int) -> int | None:
     card = (
         f"🟢 Новый лид #{lead_id}\n"
         f"Услуга: {_esc(service)} (payload: {_esc(payload)})\n"
-        f"Клиент: {_esc(user.get('first_name'))} @{_esc(user.get('username'))} "
+        f"Клиент: {_esc(user.get('name') or user.get('first_name'))} @{_esc(user.get('username'))} "
         f"(id {user_id}), язык {_esc(user.get('lang'))}\n"
+        f"Телефон: {_esc(user.get('phone'))}\n"
         f"Ниша: {_esc(brief.get('niche'))}\n"
         f"Срок: {_esc(brief.get('deadline'))}\n"
         f"Бюджет: {_esc(brief.get('budget_hint'))}\n"

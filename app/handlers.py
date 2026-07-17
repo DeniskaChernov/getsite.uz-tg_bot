@@ -1,4 +1,4 @@
-"""Пользовательские хендлеры: /start с payload, диалог через LLM, edge cases."""
+"""Пользовательские хендлеры: регистрация (язык → имя → телефон), диалог, edge cases."""
 from __future__ import annotations
 
 import asyncio
@@ -8,7 +8,15 @@ import re
 from aiogram import Bot, F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import Command, CommandObject, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+)
 
 from app import texts
 from app.config import config
@@ -23,7 +31,7 @@ from app.llm import (
 )
 from app.ratelimit import limiter
 from app.services import resolve_payload
-from app.storage import Storage
+from app.storage import REG_DONE, REG_NEED_LANG, REG_NEED_NAME, REG_NEED_PHONE, BotStorage
 
 log = logging.getLogger(__name__)
 router = Router()
@@ -31,6 +39,7 @@ router = Router()
 _FORGET_RE = re.compile(
     r"(удали(те)?\s+мои\s+данные|delete\s+my\s+data|ma'?lumotlarimni\s+o'?chir)", re.IGNORECASE
 )
+_PHONE_DIGITS_RE = re.compile(r"\d")
 
 
 def _quick_kb(lang: str) -> InlineKeyboardMarkup:
@@ -39,11 +48,36 @@ def _quick_kb(lang: str) -> InlineKeyboardMarkup:
     ])
 
 
-async def _user_lang(storage: Storage, message: Message) -> str:
-    user = await storage.get_user(message.from_user.id)
-    if user:
-        return user["lang"]
-    return texts.normalize_lang(message.from_user.language_code)
+def _lang_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t, callback_data=cb)] for t, cb in texts.LANG_BUTTONS
+    ])
+
+
+def _phone_kb(lang: str) -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=texts.SHARE_PHONE_BTN[lang], request_contact=True)],
+            [KeyboardButton(text=texts.SKIP_BTN[lang])],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
+async def _service_greeting(bot: Bot, storage: BotStorage, user_id: int, chat_id: int,
+                            lang: str, prefix: str = "") -> None:
+    """Приветствие по услуге из payload (шаблон, без LLM) + быстрые кнопки."""
+    user = await storage.get_user(user_id)
+    svc = resolve_payload(user.get("payload") if user else None)
+    if svc.payload == "discuss":
+        text = texts.START_NO_PAYLOAD[lang]
+    else:
+        text = texts.start_with_service(svc, lang)
+    if prefix:
+        text = f"{prefix} {text}"
+    await storage.add_message(user_id, "assistant", text)
+    await bot.send_message(chat_id, text, reply_markup=_quick_kb(lang))
 
 
 # --- группы/каналы: бот работает только в личке ---
@@ -64,51 +98,77 @@ async def ignore_non_private(message: Message):
     return
 
 
-# --- /start ---
+# --- /start: сначала выбор языка, потом регистрация ---
 
 @router.message(CommandStart(), F.chat.type == ChatType.PRIVATE)
-async def cmd_start(message: Message, command: CommandObject, storage: Storage):
+async def cmd_start(message: Message, bot: Bot, command: CommandObject, storage: BotStorage):
     if message.from_user.is_bot:
         return
-    lang = texts.normalize_lang(message.from_user.language_code)
-    existing = await storage.get_user(message.from_user.id)
-    if existing:
-        lang = existing["lang"]
-
     svc = resolve_payload(command.args)
+    existing = await storage.get_user(message.from_user.id)
+    lang = existing["lang"] if existing else texts.normalize_lang(message.from_user.language_code)
+
     await storage.upsert_user(
         message.from_user.id, message.from_user.username, message.from_user.first_name,
         lang, payload=svc.payload,
     )
     await storage.log_event("start", message.from_user.id, svc.payload)
 
-    # Мгновенный шаблон без LLM
-    if svc.payload == "discuss":
-        text = texts.START_NO_PAYLOAD[lang]
-    else:
-        text = texts.start_with_service(svc, lang)
-    await storage.add_message(message.from_user.id, "assistant", text)
-    await message.answer(text, reply_markup=_quick_kb(lang))
+    # Зарегистрированный клиент: помним его, здороваемся по имени и сразу к делу
+    if existing and existing.get("reg_state") == REG_DONE:
+        prefix = texts.WELCOME_BACK[lang].format(name=existing.get("name") or existing.get("first_name") or "")
+        await _service_greeting(bot, storage, message.from_user.id, message.chat.id, lang, prefix)
+        return
+
+    # Новый клиент: выбор языка первым сообщением
+    await storage.set_reg_state(message.from_user.id, REG_NEED_LANG)
+    await message.answer(texts.CHOOSE_LANG, reply_markup=_lang_kb())
+
+
+@router.callback_query(F.data.startswith("lang_"))
+async def cb_lang(query: CallbackQuery, bot: Bot, storage: BotStorage):
+    lang = query.data.removeprefix("lang_")
+    if lang not in ("ru", "uz", "en"):
+        await query.answer()
+        return
+    user = await storage.get_user(query.from_user.id)
+    if not user:
+        await storage.upsert_user(query.from_user.id, query.from_user.username,
+                                  query.from_user.first_name, lang)
+        user = await storage.get_user(query.from_user.id)
+    await storage.set_lang(query.from_user.id, lang)
+    await query.answer()
+    try:
+        await query.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    # Смена языка после регистрации - просто подтверждение
+    if user.get("reg_state") == REG_DONE:
+        await bot.send_message(query.message.chat.id, texts.LANG_CHANGED[lang])
+        return
+
+    await storage.set_reg_state(query.from_user.id, REG_NEED_NAME)
+    await bot.send_message(query.message.chat.id, texts.ASK_NAME[lang])
 
 
 # --- сервисные команды ---
 
 @router.message(Command("help"), F.chat.type == ChatType.PRIVATE)
-async def cmd_help(message: Message, storage: Storage):
-    lang = await _user_lang(storage, message)
+async def cmd_help(message: Message, storage: BotStorage):
+    user = await storage.get_user(message.from_user.id)
+    lang = user["lang"] if user else texts.normalize_lang(message.from_user.language_code)
     await message.answer(texts.HELP_REPLY[lang])
 
 
 @router.message(Command("lang"), F.chat.type == ChatType.PRIVATE)
-async def cmd_lang(message: Message, command: CommandObject, storage: Storage):
+async def cmd_lang(message: Message, command: CommandObject, storage: BotStorage):
     lang = (command.args or "").strip().lower()
     if lang not in ("ru", "uz", "en"):
-        current = await _user_lang(storage, message)
-        await message.answer(texts.HELP_REPLY[current])
+        await message.answer(texts.CHOOSE_LANG, reply_markup=_lang_kb())
         return
-    await storage.upsert_user(
-        message.from_user.id, message.from_user.username, message.from_user.first_name, lang,
-    )
+    await storage.upsert_user(message.from_user.id, message.from_user.username,
+                              message.from_user.first_name, lang)
     await storage.set_lang(message.from_user.id, lang)
     await message.answer(texts.LANG_CHANGED[lang])
 
@@ -116,7 +176,7 @@ async def cmd_lang(message: Message, command: CommandObject, storage: Storage):
 # --- inline-кнопки быстрого ответа ---
 
 @router.callback_query(F.data == "qb_contact")
-async def cb_contact(query: CallbackQuery, storage: Storage):
+async def cb_contact(query: CallbackQuery, storage: BotStorage):
     user = await storage.get_user(query.from_user.id)
     lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
     await query.answer()
@@ -125,7 +185,7 @@ async def cb_contact(query: CallbackQuery, storage: Storage):
 
 
 @router.callback_query(F.data.in_({"qb_estimate", "qb_timeline"}))
-async def cb_quick(query: CallbackQuery, bot: Bot, storage: Storage):
+async def cb_quick(query: CallbackQuery, bot: Bot, storage: BotStorage):
     user = await storage.get_user(query.from_user.id)
     lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
     await query.answer()
@@ -133,14 +193,35 @@ async def cb_quick(query: CallbackQuery, bot: Bot, storage: Storage):
     await _dialog_turn(bot, storage, query.from_user.id, query.message.chat.id, user_text, lang)
 
 
+# --- контакт (шаг регистрации: телефон) ---
+
+@router.message(F.chat.type == ChatType.PRIVATE, F.contact)
+async def on_contact(message: Message, bot: Bot, storage: BotStorage):
+    user = await storage.get_user(message.from_user.id)
+    if not user:
+        return
+    lang = user["lang"]
+    if user.get("reg_state") == REG_NEED_PHONE and message.contact.user_id == message.from_user.id:
+        await storage.set_phone(message.from_user.id, message.contact.phone_number)
+        await _finish_registration(bot, storage, message, lang)
+
+
+async def _finish_registration(bot: Bot, storage: BotStorage, message: Message, lang: str) -> None:
+    await storage.set_reg_state(message.from_user.id, REG_DONE)
+    await storage.log_event("registered", message.from_user.id)
+    await message.answer(texts.REG_DONE_PREFIX[lang], reply_markup=ReplyKeyboardRemove())
+    await _service_greeting(bot, storage, message.from_user.id, message.chat.id, lang)
+
+
 # --- медиа и прочий не-текст ---
 
 @router.message(F.chat.type == ChatType.PRIVATE,
                 F.photo | F.voice | F.video | F.document | F.audio | F.video_note)
-async def on_media(message: Message, storage: Storage):
+async def on_media(message: Message, storage: BotStorage):
     if message.from_user.is_bot or message.forward_origin:
         return
-    lang = await _user_lang(storage, message)
+    user = await storage.get_user(message.from_user.id)
+    lang = user["lang"] if user else texts.normalize_lang(message.from_user.language_code)
     await message.answer(texts.MEDIA_REPLY[lang])
 
 
@@ -149,11 +230,10 @@ async def on_sticker(message: Message):
     return
 
 
-# --- основной диалог ---
+# --- основной текстовый поток ---
 
 @router.message(F.chat.type == ChatType.PRIVATE, F.text)
-async def on_text(message: Message, bot: Bot, storage: Storage):
-    # Анти-спам: пересланное и сообщения от ботов игнорируем
+async def on_text(message: Message, bot: Bot, storage: BotStorage):
     if message.from_user.is_bot or message.forward_origin:
         return
     user = await storage.get_user(message.from_user.id)
@@ -161,26 +241,48 @@ async def on_text(message: Message, bot: Bot, storage: Storage):
         return
     lang = user["lang"] if user else texts.normalize_lang(message.from_user.language_code)
     if not user:
-        await storage.upsert_user(
-            message.from_user.id, message.from_user.username, message.from_user.first_name, lang,
-        )
+        await storage.upsert_user(message.from_user.id, message.from_user.username,
+                                  message.from_user.first_name, lang)
+        user = await storage.get_user(message.from_user.id)
 
-    text = message.text
+    text = message.text.strip()
+    reg_state = user.get("reg_state") or REG_NEED_LANG
 
-    # «Удалите мои данные» → подтверждение + задача админу
+    # --- шаги регистрации ---
+    if reg_state == REG_NEED_LANG:
+        await message.answer(texts.CHOOSE_LANG, reply_markup=_lang_kb())
+        return
+
+    if reg_state == REG_NEED_NAME:
+        if len(text) > 50 or text.startswith("/"):
+            await message.answer(texts.NAME_TOO_LONG[lang])
+            return
+        await storage.set_name(message.from_user.id, text)
+        await message.answer(texts.ASK_PHONE[lang].format(name=text), reply_markup=_phone_kb(lang))
+        await storage.set_reg_state(message.from_user.id, REG_NEED_PHONE)
+        return
+
+    if reg_state == REG_NEED_PHONE:
+        digits = "".join(_PHONE_DIGITS_RE.findall(text))
+        if text != texts.SKIP_BTN[lang] and 9 <= len(digits) <= 15:
+            await storage.set_phone(message.from_user.id, "+" + digits if not text.startswith("+") else text)
+        await _finish_registration(bot, storage, message, lang)
+        return
+
+    # --- обычный диалог ---
+
     if _FORGET_RE.search(text):
         await message.answer(texts.FORGET_CONFIRM_USER[lang])
         try:
             await bot.send_message(
                 config.admin_chat_id,
                 f"🗑 Запрос на удаление данных от id {message.from_user.id} "
-                f"(@{message.from_user.username or '—'}). Выполните: /forget {message.from_user.id}",
+                f"(@{message.from_user.username or '-'}). Выполните: /forget {message.from_user.id}",
             )
         except Exception:
             log.error("Failed to notify admins about forget request", exc_info=True)
         return
 
-    # Rate-limit без LLM
     if not limiter.check_user(message.from_user.id):
         await message.answer(texts.RATE_LIMIT_REPLY[lang])
         return
@@ -192,12 +294,11 @@ async def on_text(message: Message, bot: Bot, storage: Storage):
     await _dialog_turn(bot, storage, message.from_user.id, message.chat.id, text, lang)
 
 
-async def _dialog_turn(bot: Bot, storage: Storage, user_id: int, chat_id: int,
+async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int,
                        user_text: str, lang: str) -> None:
     """Один ход диалога: LLM-ответ + детерминированная проверка готовности брифа."""
     await storage.add_message(user_id, "user", user_text)
 
-    # Circuit breaker: всплеск трафика → шаблон без LLM + алерт
     if not limiter.check_global():
         await bot.send_message(chat_id, texts.LLM_FALLBACK_REPLY[lang])
         if not getattr(limiter, "_alerted", False):
@@ -223,6 +324,7 @@ async def _dialog_turn(bot: Bot, storage: Storage, user_id: int, chat_id: int,
             user_id, history,
             svc.name_ru if svc.payload != "discuss" else None,
             lang, brief_state,
+            client_name=(user.get("name") if user else None),
         )
     except LLMBusy:
         await bot.send_message(chat_id, texts.RATE_LIMIT_REPLY[lang])

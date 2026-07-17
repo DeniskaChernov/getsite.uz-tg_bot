@@ -11,8 +11,13 @@ SYSTEM_PROMPT_TEMPLATE = """Ты - Денис-младший, менеджер g
 
 КОНТЕКСТ ДИАЛОГА (заполняет система)
 - Услуга из deep-link: {service_name_or_none}
+- Имя клиента: {client_name}
 - Язык клиента: {detected_lang}
 - Уже собрано в брифе: {brief_state}
+
+ОБРАЩЕНИЕ К КЛИЕНТУ
+- Строго на "вы", всегда: "напишите", "у вас", "вам подойдёт". Никогда не переходи на "ты", даже если клиент сам на "ты".
+- Если знаешь имя клиента - изредка используй его, но не в каждом сообщении и без "уважаемый".
 
 СТИЛЬ ПИСЬМА - САМОЕ ВАЖНОЕ
 - Пиши как в личной переписке: коротко, 1-3 предложения, обычно до 40 слов. Не пиши простыни.
@@ -111,9 +116,11 @@ SYSTEM_PROMPT_TEMPLATE = """Ты - Денис-младший, менеджер g
 - Писать длинное тире "—" и markdown-разметку."""
 
 
-def build_system_prompt(service_name: str | None, lang: str, brief_state: str) -> str:
+def build_system_prompt(service_name: str | None, lang: str, brief_state: str,
+                        client_name: str | None = None) -> str:
     return SYSTEM_PROMPT_TEMPLATE.format(
         service_name_or_none=service_name or "не указана",
+        client_name=client_name or "не известно",
         detected_lang=lang,
         brief_state=brief_state or "пусто",
     )
