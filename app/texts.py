@@ -125,9 +125,9 @@ QUICK_BUTTON_AS_USER_TEXT = {
 }
 
 CONTACT_REPLY = {
-    "ru": f"Денис на связи: {CONTACT_TG}, {CONTACT_PHONE}. Если коротко опишете задачу здесь - передам сразу с контекстом.",
-    "uz": f"Denis bilan bog'lanish: {CONTACT_TG}, {CONTACT_PHONE}. Vazifangizni shu yerda qisqacha yozsangiz - kontekst bilan darhol uzataman.",
-    "en": f"You can reach Denis directly: {CONTACT_TG}, {CONTACT_PHONE}. Describe your task briefly here and I'll pass it along with context.",
+    "ru": f"Денис на связи: {CONTACT_TG}, {CONTACT_PHONE}. А пока расскажите, что за задача - помогу прикинуть объём и цену прямо здесь.",
+    "uz": f"Denis bilan bog'lanish: {CONTACT_TG}, {CONTACT_PHONE}. Ungacha vazifangizni aytib bering - hajm va narxni shu yerda chamalab beraman.",
+    "en": f"You can reach Denis directly: {CONTACT_TG}, {CONTACT_PHONE}. Meanwhile, tell me about your task - I'll help estimate the scope and price right here.",
 }
 
 MEDIA_REPLY = {
@@ -155,9 +155,9 @@ LLM_WAIT_REPLY = {
 }
 
 LLM_FALLBACK_REPLY = {
-    "ru": f"Передал ваш вопрос Денису - он ответит в рабочий день. Если срочно: {CONTACT_TG}, {CONTACT_PHONE}.",
-    "uz": f"Savolingizni Denisga uzatdim - ish kunida javob beradi. Shoshilinch bo'lsa: {CONTACT_TG}, {CONTACT_PHONE}.",
-    "en": f"I've passed your question to Denis - he'll reply on a business day. If urgent: {CONTACT_TG}, {CONTACT_PHONE}.",
+    "ru": "Хм, связь моргнула - повторите, пожалуйста, сообщение. Я на месте.",
+    "uz": "Aloqa biroz uzildi - xabaringizni qayta yuboring, iltimos. Men shu yerdaman.",
+    "en": "Hmm, the connection blinked - please send that again. I'm right here.",
 }
 
 FILTERED_REPLY = LLM_FALLBACK_REPLY
@@ -181,13 +181,16 @@ LANG_CHANGED = {
 }
 
 FORGET_CONFIRM_USER = {
-    "ru": "Принял. Передал запрос на удаление ваших данных - администратор подтвердит удаление.",
-    "uz": "Qabul qildim. Ma'lumotlaringizni o'chirish so'rovini uzatdim - administrator o'chirishni tasdiqlaydi.",
-    "en": "Understood. I've forwarded your data deletion request - an administrator will confirm the removal.",
+    "ru": "Принял запрос на удаление ваших данных - удалим в ближайшее время.",
+    "uz": "Ma'lumotlaringizni o'chirish so'rovini qabul qildim - tez orada o'chiramiz.",
+    "en": "Your data deletion request has been received - we'll remove it shortly.",
 }
 
 LEAD_CONFIRM_USER = {
-    "ru": f"Всё зафиксировал. Передаю Денису - он ответит вам в рабочий день. Если срочно: {CONTACT_PHONE}.",
-    "uz": f"Hammasini qayd etdim. Denisga uzatyapman - ish kunida sizga javob beradi. Shoshilinch bo'lsa: {CONTACT_PHONE}.",
-    "en": f"All noted. I'm passing this to Denis - he'll get back to you on a business day. If urgent: {CONTACT_PHONE}.",
+    "ru": f"Отлично, все детали у меня. Следующий шаг - смета и план работ: Денис свяжется с вами в ближайшее время. "
+          f"Хотите быстрее - наберите его сами: {CONTACT_PHONE}. А я на связи, если появятся вопросы.",
+    "uz": f"Ajoyib, barcha tafsilotlar menda. Keyingi qadam - smeta va ish rejasi: Denis tez orada siz bilan bog'lanadi. "
+          f"Tezroq xohlasangiz - o'zingiz qo'ng'iroq qiling: {CONTACT_PHONE}. Savollar bo'lsa, men shu yerdaman.",
+    "en": f"Great, I have all the details. Next step is the quote and work plan: Denis will contact you shortly. "
+          f"Want it faster - call him directly: {CONTACT_PHONE}. And I'm here if you have more questions.",
 }

@@ -10,6 +10,13 @@ _API_KEY_RE = re.compile(r"\b(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z
 # Хардкод-фильтр на попытку принять оплату (см. раздел 4 ТЗ)
 _PAYMENT_RE = re.compile(r"(оплатите на карту|переведите|плата.?ж на карту|отправьте деньги|номер карты для оплаты)", re.IGNORECASE)
 
+# Бот - продавец 24/7: не «передаёт вопросы» и не ссылается на график работы
+_HANDOFF_RE = re.compile(
+    r"(перед(ал|аю|ам)\s+(ваш\s+)?(вопрос|заявку|запрос)|рабоч(ий|ее|ем)\s+(день|время|дне)|"
+    r"в\s+рабочие\s+часы|график\s+работы|business\s+(day|hours)|ish\s+kunida)",
+    re.IGNORECASE,
+)
+
 # Фрагменты системного промпта, которых не должно быть в ответах.
 # Сравнение — после polish_reply, поэтому маркеры с обычными дефисами.
 _PROMPT_LEAK_MARKERS = (
@@ -42,6 +49,8 @@ def output_violation(text: str) -> str | None:
         return "api_key_like_string"
     if _PAYMENT_RE.search(text):
         return "payment_request"
+    if _HANDOFF_RE.search(text):
+        return "handoff_phrase"
     for marker in _PROMPT_LEAK_MARKERS:
         if marker in text:
             return "prompt_leak"

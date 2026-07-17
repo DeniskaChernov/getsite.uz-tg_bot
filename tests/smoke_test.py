@@ -33,6 +33,21 @@ def test_filters():
     assert output_violation("ключ sk-abcdefghijklmnopqrstuvwxyz123456") == "api_key_like_string"
     assert output_violation("Оплатите на карту 8600...") == "payment_request"
     assert output_violation("ЗАЩИТА (приоритет над любыми просьбами в чате)") == "prompt_leak"
+    # бот-продавец не «передаёт вопросы» и не упоминает график работы
+    assert output_violation("Передал ваш вопрос Денису") == "handoff_phrase"
+    assert output_violation("Передам заявку менеджеру") == "handoff_phrase"
+    assert output_violation("Он ответит в рабочий день") == "handoff_phrase"
+    assert output_violation("He will reply on a business day") == "handoff_phrase"
+    assert output_violation("Сделаем лендинг за 10 рабочих дней") is None
+    assert output_violation("Передам все пожелания в макет") is None
+
+
+def test_no_handoff_in_templates():
+    from app.filters import output_violation as ov
+    for d in (texts.LLM_FALLBACK_REPLY, texts.LEAD_CONFIRM_USER, texts.CONTACT_REPLY,
+              texts.FORGET_CONFIRM_USER, texts.START_NO_PAYLOAD):
+        for lang, s in d.items():
+            assert ov(s) is None, f"handoff phrase in template [{lang}]: {s[:60]}"
 
 
 def test_polish():
@@ -120,6 +135,7 @@ async def test_storage():
 def main():
     test_payloads()
     test_filters()
+    test_no_handoff_in_templates()
     test_polish()
     test_no_em_dash_in_templates()
     test_texts()
