@@ -91,10 +91,14 @@ def test_prompt():
 
 
 def test_brief_state():
-    assert not brief_is_complete({})
-    assert not brief_is_complete({"service": "лендинг"})
-    assert brief_is_complete({"service": "лендинг", "niche": "кафе",
-                              "summary": "Нужен лендинг для кафе.", "deadline": "к марту"})
+    full = {"service": "лендинг", "niche": "кафе",
+            "summary": "Нужен лендинг для кафе.", "deadline": "к марту"}
+    assert not brief_is_complete({}, 10)
+    assert not brief_is_complete({"service": "лендинг"}, 10)
+    assert brief_is_complete(full, 4)
+    # мало сообщений клиента - лид не уходит, даже если поля заполнены
+    assert not brief_is_complete(full, 2)
+    assert not brief_is_complete(full, 0)
 
 
 async def test_storage():

@@ -345,11 +345,13 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
     # Детерминированная передача лида: извлекаем бриф кодом, не моделью
     if brief.get("_lead_sent"):
         return
-    extracted = await extract_brief(await storage.history(user_id))
+    fresh_history = await storage.history(user_id, limit=50)
+    user_msg_count = sum(1 for m in fresh_history if m["role"] == "user")
+    extracted = await extract_brief(fresh_history)
     if extracted:
         merged = {**brief, **{k: v for k, v in extracted.items() if v}}
         await storage.save_brief(user_id, merged)
-        if brief_is_complete(merged):
+        if brief_is_complete(merged, user_msg_count):
             merged["_lead_sent"] = True
             await storage.save_brief(user_id, merged)
             await storage.log_event("brief_done", user_id)

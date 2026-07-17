@@ -73,8 +73,10 @@ async def generate_reply(user_id: int, history: list[dict[str, str]],
 
 
 _BRIEF_KEYS = ("service", "niche", "deadline", "budget_hint", "contact", "links", "summary")
-# Бриф считается собранным, когда есть суть, услуга и ниша + срок или бюджет
+# Бриф считается собранным, когда есть суть, услуга и ниша + срок или бюджет,
+# и клиент реально поучаствовал в диалоге (не раньше 4 своих сообщений)
 _REQUIRED = ("service", "niche", "summary")
+MIN_USER_MESSAGES_FOR_LEAD = 4
 
 
 async def extract_brief(history: list[dict[str, str]]) -> dict[str, str]:
@@ -101,7 +103,9 @@ async def extract_brief(history: list[dict[str, str]]) -> dict[str, str]:
         return {}
 
 
-def brief_is_complete(brief: dict[str, str]) -> bool:
+def brief_is_complete(brief: dict[str, str], user_messages: int = 0) -> bool:
+    if user_messages < MIN_USER_MESSAGES_FOR_LEAD:
+        return False
     if not brief:
         return False
     if not all(brief.get(k) for k in _REQUIRED):
