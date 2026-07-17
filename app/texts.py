@@ -23,37 +23,43 @@ def normalize_lang(code: str | None) -> Lang:
     return "ru"
 
 
-# --- Регистрация: выбор языка сразу после /start ---
+# --- Регистрация: выбор языка сразу после /start, в фирменном тоне getsite ---
 
 CHOOSE_LANG = (
-    "Выберите язык / Tilni tanlang / Choose your language"
+    "Привет! Salom! Hello! 👋\n\n"
+    "Я помощник getsite - мы делаем сайты и ботов, которые приносят заявки, "
+    "а не просто красиво висят в интернете.\n\n"
+    "Сначала о главном - на каком языке вам удобнее?"
 )
 
 LANG_BUTTONS = [
-    ("Русский", "lang_ru"),
-    ("O'zbekcha", "lang_uz"),
-    ("English", "lang_en"),
+    ("🇷🇺 Русский", "lang_ru"),
+    ("🇺🇿 O'zbekcha", "lang_uz"),
+    ("🇬🇧 English", "lang_en"),
 ]
 
 ASK_NAME = {
-    "ru": "Отлично. Как я могу к вам обращаться?",
-    "uz": "Ajoyib. Sizga qanday murojaat qilsam bo'ladi?",
-    "en": "Great. How may I address you?",
+    "ru": "Отлично, договорились. Чтобы не обращаться к вам «уважаемый клиент» - как вас зовут?",
+    "uz": "Kelishdik. Sizga «hurmatli mijoz» deb murojaat qilmaslik uchun - ismingiz nima?",
+    "en": "Perfect. So I don't have to call you \"dear customer\" - what's your name?",
 }
 
 ASK_PHONE = {
-    "ru": "Приятно познакомиться, {name}! Оставите номер телефона? Так Денису будет проще с вами связаться. "
-          "Нажмите кнопку ниже или отправьте номер текстом. Можно и пропустить.",
-    "uz": "Tanishganimdan xursandman, {name}! Telefon raqamingizni qoldirasizmi? Shunda Denis siz bilan "
-          "bog'lanishi osonroq bo'ladi. Quyidagi tugmani bosing yoki raqamni yozib yuboring. O'tkazib yuborsangiz ham bo'ladi.",
-    "en": "Nice to meet you, {name}! Would you like to leave your phone number? It will make it easier for Denis "
-          "to reach you. Tap the button below or type the number. You can also skip this step.",
+    "ru": "{name}, рад знакомству! Оставите номер телефона? Обещаю: никакого спама и рассылок - "
+          "он нужен только, чтобы обсудить ваш проект голосом, если дойдёт до дела. "
+          "Не хотите - смело жмите «Пропустить».",
+    "uz": "{name}, tanishganimdan xursandman! Telefon raqamingizni qoldirasizmi? Va'da beraman: hech qanday "
+          "spam va tarqatmalar bo'lmaydi - u faqat loyihangizni ovozda muhokama qilish uchun kerak. "
+          "Xohlamasangiz - bemalol «O'tkazib yuborish» tugmasini bosing.",
+    "en": "{name}, great to meet you! Would you like to leave your phone number? I promise: no spam, "
+          "no newsletters - it's only for discussing your project by voice if it comes to that. "
+          "Not keen - just tap \"Skip\".",
 }
 
 SHARE_PHONE_BTN = {
-    "ru": "Поделиться номером",
-    "uz": "Raqamni yuborish",
-    "en": "Share my number",
+    "ru": "📱 Поделиться номером",
+    "uz": "📱 Raqamni yuborish",
+    "en": "📱 Share my number",
 }
 
 SKIP_BTN = {
@@ -63,32 +69,32 @@ SKIP_BTN = {
 }
 
 REG_DONE_PREFIX = {
-    "ru": "Спасибо, записал!",
-    "uz": "Rahmat, yozib oldim!",
-    "en": "Thank you, noted!",
+    "ru": "Отлично, записал. Теперь к делу!",
+    "uz": "Ajoyib, yozib oldim. Endi ishga o'tamiz!",
+    "en": "Great, noted. Now, down to business!",
 }
 
 WELCOME_BACK = {
-    "ru": "С возвращением, {name}!",
-    "uz": "Qaytganingiz bilan, {name}!",
-    "en": "Welcome back, {name}!",
+    "ru": "С возвращением, {name}! Рад вас видеть.",
+    "uz": "Qaytganingiz bilan, {name}! Sizni ko'rganimdan xursandman.",
+    "en": "Welcome back, {name}! Good to see you.",
 }
 
 NAME_TOO_LONG = {
-    "ru": "Давайте покороче - просто имя, до 50 символов.",
-    "uz": "Qisqaroq yozing, iltimos - faqat ism, 50 belgigacha.",
-    "en": "A bit shorter, please - just a name, up to 50 characters.",
+    "ru": "Ого, длинновато для имени. Давайте покороче - до 50 символов.",
+    "uz": "Ism uchun biroz uzun-ku. Qisqaroq yozing - 50 belgigacha.",
+    "en": "That's a bit long for a name. Something shorter, please - up to 50 characters.",
 }
 
 # --- Приветствия ---
 
 START_NO_PAYLOAD = {
-    "ru": "Я помощник getsite - помогу разобраться с задачей и прикинуть цену. "
-          "Что вам нужно: сайт, Telegram-бот, автоматизация или поддержка?",
-    "uz": "Men getsite yordamchisiman - vazifangizni aniqlab, narxni chamalab beraman. "
-          "Sizga nima kerak: sayt, Telegram-bot, avtomatlashtirish yoki texnik yordam?",
-    "en": "I'm the getsite assistant - I'll help clarify your task and estimate the price. "
-          "What do you need: a website, a Telegram bot, automation, or support?",
+    "ru": "Итак, чем займёмся? Сайт, Telegram-бот, автоматизация или поддержка - "
+          "расскажите про задачу, помогу прикинуть объём и цену.",
+    "uz": "Xo'sh, nimadan boshlaymiz? Sayt, Telegram-bot, avtomatlashtirish yoki texnik yordam - "
+          "vazifangizni aytib bering, hajm va narxni chamalab beraman.",
+    "en": "So, what are we building? A website, a Telegram bot, automation, or support - "
+          "tell me about your task and I'll help estimate the scope and price.",
 }
 
 _SERVICE_HOOK = {
