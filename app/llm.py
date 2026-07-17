@@ -13,7 +13,7 @@ from collections import defaultdict
 from openai import AsyncOpenAI
 
 from app.config import config
-from app.filters import output_violation
+from app.filters import output_violation, polish_reply
 from app.prompt import BRIEF_EXTRACTOR_PROMPT, build_system_prompt
 
 log = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ async def generate_reply(user_id: int, history: list[dict[str, str]],
             ),
             timeout=LLM_TIMEOUT,
         )
-        text = (resp.choices[0].message.content or "").strip()
+        text = polish_reply((resp.choices[0].message.content or "").strip())
         reason = output_violation(text)
         if reason:
             log.error("Output filter hit: %s (user %s)", reason, user_id)

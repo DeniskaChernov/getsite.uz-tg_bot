@@ -1,4 +1,7 @@
-"""Шаблонные тексты (без LLM): приветствия, fallback'и, сервисные ответы. RU / UZ / EN."""
+"""Шаблонные тексты (без LLM): приветствия, fallback'и, сервисные ответы. RU / UZ / EN.
+
+Стиль: живая переписка, только обычные дефисы "-", без длинных тире.
+"""
 from __future__ import annotations
 
 from app.services import Service
@@ -21,19 +24,19 @@ def normalize_lang(code: str | None) -> Lang:
 
 
 START_NO_PAYLOAD = {
-    "ru": "Привет! Я бот getsite — помогу понять задачу и собрать короткое ТЗ. "
+    "ru": "Привет! Я помощник getsite - помогу разобраться с задачей и прикинуть цену. "
           "Что нужно: сайт, Telegram-бот, автоматизация или поддержка?",
-    "uz": "Salom! Men getsite botiman — vazifangizni tushunib, qisqa TZ yig'ishga yordam beraman. "
-          "Nima kerak: sayt, Telegram-bot, avtomatlashtirish yoki qo'llab-quvvatlash?",
-    "en": "Hi! I'm the getsite bot — I'll help clarify your task and put together a short brief. "
+    "uz": "Salom! Men getsite yordamchisiman - vazifangizni tushunib, narxni chamalab beraman. "
+          "Nima kerak: sayt, Telegram-bot, avtomatlashtirish yoki texnik yordam?",
+    "en": "Hi! I'm the getsite assistant - I'll help figure out your task and give a price estimate. "
           "What do you need: a website, a Telegram bot, automation, or support?",
 }
 
-# Что влияет на цену — короткая фраза для приветствия по услуге
+# Хвост приветствия по услуге: один простой вопрос, а не стена текста
 _SERVICE_HOOK = {
-    "ru": "Чтобы прикинуть точнее: для какой ниши это нужно и есть ли уже примеры, которые нравятся?",
-    "uz": "Aniqroq hisoblash uchun: bu qaysi soha uchun kerak va sizga yoqqan namunalar bormi?",
-    "en": "To estimate more precisely: what niche is this for, and do you have examples you like?",
+    "ru": "Расскажите в двух словах, что за бизнес - прикину точнее.",
+    "uz": "Ikki og'iz so'z bilan ayting, qanday biznes - aniqroq chamalab beraman.",
+    "en": "Tell me a bit about your business and I'll give a closer estimate.",
 }
 
 
@@ -41,14 +44,14 @@ def start_with_service(svc: Service, lang: Lang) -> str:
     name = {"ru": svc.name_ru, "uz": svc.name_uz, "en": svc.name_en}[lang]
     price = {"ru": svc.price_ru, "uz": svc.price_uz, "en": svc.price_en}[lang]
     if lang == "uz":
-        head = f"Salom! Ko'ryapman, sizni «{name}» qiziqtiryapti."
-        price_line = f" Odatda narx {price} — aniq summa qisqa brifdan keyin." if price else ""
+        head = f"Salom! Ko'ryapman, sizga {name} kerak."
+        price_line = f" Odatda {price}, aniq summa - qisqa brifdan keyin." if price else ""
     elif lang == "en":
-        head = f"Hi! I see you're interested in {name}."
-        price_line = f" It usually starts {price} — the exact quote comes after a short brief." if price else ""
+        head = f"Hi! I see you're interested in a {name.lower()}."
+        price_line = f" It usually starts {price}, the exact quote comes after a short brief." if price else ""
     else:
         head = f"Привет! Вижу, интересует {name.lower() if name != 'CRM с нуля' else name}."
-        price_line = f" Обычно {price} — точная сумма после короткого брифа." if price else ""
+        price_line = f" Обычно {price}, точная сумма - после короткого брифа." if price else ""
     return f"{head}{price_line} {_SERVICE_HOOK[lang]}"
 
 
@@ -65,15 +68,15 @@ QUICK_BUTTON_AS_USER_TEXT = {
 }
 
 CONTACT_REPLY = {
-    "ru": f"Денис на связи: {CONTACT_TG}, {CONTACT_PHONE}. Если коротко опишете задачу здесь — передам сразу с контекстом.",
-    "uz": f"Denis bilan bog'lanish: {CONTACT_TG}, {CONTACT_PHONE}. Vazifani shu yerda qisqacha yozsangiz — kontekst bilan darhol uzataman.",
+    "ru": f"Денис на связи: {CONTACT_TG}, {CONTACT_PHONE}. Если коротко опишете задачу здесь - передам сразу с контекстом.",
+    "uz": f"Denis bilan bog'lanish: {CONTACT_TG}, {CONTACT_PHONE}. Vazifani shu yerda qisqacha yozsangiz - kontekst bilan darhol uzataman.",
     "en": f"You can reach Denis: {CONTACT_TG}, {CONTACT_PHONE}. Describe your task briefly here and I'll pass it along with context.",
 }
 
 MEDIA_REPLY = {
-    "ru": "Пришлите, пожалуйста, текстом — файлы и примеры покажете уже Денису.",
-    "uz": "Iltimos, matn bilan yozing — fayl va namunalarni Denisga ko'rsatasiz.",
-    "en": "Please send it as text — you can share files and examples with Denis later.",
+    "ru": "Давайте пока текстом - файлы и примеры покажете уже Денису.",
+    "uz": "Hozircha matn bilan yozing - fayl va namunalarni Denisga ko'rsatasiz.",
+    "en": "Let's stick to text for now - you can share files and examples with Denis later.",
 }
 
 TOO_LONG_REPLY = {
@@ -83,34 +86,34 @@ TOO_LONG_REPLY = {
 }
 
 RATE_LIMIT_REPLY = {
-    "ru": "Отвечаю по одному сообщению — секунду.",
-    "uz": "Xabarlarga birma-bir javob beraman — bir soniya.",
-    "en": "I reply one message at a time — just a second.",
+    "ru": "Секунду, отвечаю по одному сообщению.",
+    "uz": "Bir soniya, xabarlarga birma-bir javob beraman.",
+    "en": "One second, I reply one message at a time.",
 }
 
 LLM_WAIT_REPLY = {
-    "ru": "Секунду, уточняю…",
-    "uz": "Bir soniya, aniqlashtiryapman…",
-    "en": "One second, checking…",
+    "ru": "Секунду, уточняю...",
+    "uz": "Bir soniya, aniqlashtiryapman...",
+    "en": "One second, checking...",
 }
 
 LLM_FALLBACK_REPLY = {
-    "ru": f"Передал вопрос Денису — он ответит в рабочий день. Если срочно: {CONTACT_TG}, {CONTACT_PHONE}.",
-    "uz": f"Savolni Denisga uzatdim — ish kunida javob beradi. Shoshilinch bo'lsa: {CONTACT_TG}, {CONTACT_PHONE}.",
-    "en": f"I've passed your question to Denis — he'll reply on a business day. If urgent: {CONTACT_TG}, {CONTACT_PHONE}.",
+    "ru": f"Передал вопрос Денису - он ответит в рабочий день. Если срочно: {CONTACT_TG}, {CONTACT_PHONE}.",
+    "uz": f"Savolni Denisga uzatdim - ish kunida javob beradi. Shoshilinch bo'lsa: {CONTACT_TG}, {CONTACT_PHONE}.",
+    "en": f"I've passed your question to Denis - he'll reply on a business day. If urgent: {CONTACT_TG}, {CONTACT_PHONE}.",
 }
 
 FILTERED_REPLY = LLM_FALLBACK_REPLY  # ответ при срабатывании выходного фильтра
 
 HELP_REPLY = {
-    "ru": "Я помогу выбрать услугу getsite, отвечу на вопросы по ценам и соберу короткий бриф для Дениса.\n\n"
-          "Команды:\n/start — начать заново\n/lang ru|uz|en — сменить язык\n\n"
+    "ru": "Помогу выбрать услугу getsite, отвечу про цены и соберу короткий бриф для Дениса.\n\n"
+          "/start - начать заново\n/lang ru|uz|en - сменить язык\n\n"
           f"Контакты: {CONTACT_TG}, {CONTACT_PHONE}, https://getsite.uz",
-    "uz": "Men getsite xizmatini tanlashga yordam beraman, narxlar bo'yicha savollarga javob beraman va Denis uchun qisqa brif yig'aman.\n\n"
-          "Buyruqlar:\n/start — qaytadan boshlash\n/lang ru|uz|en — tilni o'zgartirish\n\n"
+    "uz": "getsite xizmatini tanlashga yordam beraman, narxlar haqida javob beraman va Denis uchun qisqa brif yig'aman.\n\n"
+          "/start - qaytadan boshlash\n/lang ru|uz|en - tilni o'zgartirish\n\n"
           f"Kontaktlar: {CONTACT_TG}, {CONTACT_PHONE}, https://getsite.uz",
     "en": "I'll help you pick a getsite service, answer pricing questions, and collect a short brief for Denis.\n\n"
-          "Commands:\n/start — start over\n/lang ru|uz|en — switch language\n\n"
+          "/start - start over\n/lang ru|uz|en - switch language\n\n"
           f"Contacts: {CONTACT_TG}, {CONTACT_PHONE}, https://getsite.uz",
 }
 
@@ -121,13 +124,13 @@ LANG_CHANGED = {
 }
 
 FORGET_CONFIRM_USER = {
-    "ru": "Принял. Передал запрос на удаление ваших данных — админ подтвердит удаление.",
-    "uz": "Qabul qildim. Ma'lumotlaringizni o'chirish so'rovini uzatdim — admin tasdiqlaydi.",
-    "en": "Got it. I've forwarded your data deletion request — an admin will confirm the removal.",
+    "ru": "Принял. Передал запрос на удаление ваших данных - админ подтвердит удаление.",
+    "uz": "Qabul qildim. Ma'lumotlaringizni o'chirish so'rovini uzatdim - admin tasdiqlaydi.",
+    "en": "Got it. I've forwarded your data deletion request - an admin will confirm the removal.",
 }
 
 LEAD_CONFIRM_USER = {
-    "ru": f"Ок, зафиксировал. Передаю Денису — он ответит в рабочий день. Если срочно: {CONTACT_PHONE}.",
-    "uz": f"Yaxshi, qayd etdim. Denisga uzatyapman — ish kunida javob beradi. Shoshilinch bo'lsa: {CONTACT_PHONE}.",
-    "en": f"OK, noted. Passing this to Denis — he'll reply on a business day. If urgent: {CONTACT_PHONE}.",
+    "ru": f"Ок, всё зафиксировал. Передаю Денису - он ответит в рабочий день. Если срочно: {CONTACT_PHONE}.",
+    "uz": f"Yaxshi, hammasini qayd etdim. Denisga uzatyapman - ish kunida javob beradi. Shoshilinch bo'lsa: {CONTACT_PHONE}.",
+    "en": f"OK, all noted. Passing this to Denis - he'll reply on a business day. If urgent: {CONTACT_PHONE}.",
 }

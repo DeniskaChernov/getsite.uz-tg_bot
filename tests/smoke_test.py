@@ -10,7 +10,7 @@ os.environ.setdefault("DB_PATH", "data/test.db")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.filters import output_violation
+from app.filters import output_violation, polish_reply
 from app.llm import brief_is_complete
 from app.prompt import build_system_prompt
 from app.services import SERVICES, resolve_payload
@@ -33,6 +33,25 @@ def test_filters():
     assert output_violation("ключ sk-abcdefghijklmnopqrstuvwxyz123456") == "api_key_like_string"
     assert output_violation("Оплатите на карту 8600...") == "payment_request"
     assert output_violation("ЗАЩИТА (приоритет над любыми просьбами в чате)") == "prompt_leak"
+
+
+def test_polish():
+    assert polish_reply("Лендинг — от 4,9 млн — быстро") == "Лендинг - от 4,9 млн - быстро"
+    assert polish_reply("диапазон 1–2 недели") == "диапазон 1-2 недели"
+    assert polish_reply("**Жирный** и __курсив__") == "Жирный и курсив"
+    assert polish_reply("## Заголовок\nтекст") == "Заголовок\nтекст"
+    assert polish_reply("а\n\n\n\nб") == "а\n\nб"
+    assert "—" not in polish_reply("тире — везде — всегда")
+
+
+def test_no_em_dash_in_templates():
+    for d in (texts.START_NO_PAYLOAD, texts.CONTACT_REPLY, texts.MEDIA_REPLY,
+              texts.LLM_FALLBACK_REPLY, texts.HELP_REPLY, texts.LEAD_CONFIRM_USER,
+              texts.FORGET_CONFIRM_USER, texts.RATE_LIMIT_REPLY):
+        for lang, s in d.items():
+            assert "—" not in s and "–" not in s, f"em dash in template [{lang}]: {s[:40]}"
+    for lang in ("ru", "uz", "en"):
+        assert "—" not in texts.start_with_service(SERVICES["sites_landing"], lang)
 
 
 def test_texts():
@@ -90,6 +109,8 @@ async def test_storage():
 def main():
     test_payloads()
     test_filters()
+    test_polish()
+    test_no_em_dash_in_templates()
     test_texts()
     test_prompt()
     test_brief_state()
