@@ -53,7 +53,10 @@ async def health(request: web.Request) -> web.Response:
 
 
 def build_dispatcher(storage: Storage) -> Dispatcher:
-    dp = Dispatcher(storage=storage)
+    # Ключ workflow_data "storage" внедряется в хендлеры по имени аргумента.
+    # Нельзя передавать storage= в конструктор: этот параметр зарезервирован под FSM.
+    dp = Dispatcher()
+    dp["storage"] = storage
     dp.include_router(admin.router)
     dp.include_router(handlers.router)
     return dp
