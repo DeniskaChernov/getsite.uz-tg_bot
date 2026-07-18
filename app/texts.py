@@ -191,11 +191,72 @@ FORGET_CONFIRM_USER = {
     "en": "Your data deletion request has been received - we'll remove it shortly.",
 }
 
+# Сводка брифа перед отправкой лида - клиент должен явно подтвердить
+BRIEF_SUMMARY_HEADER = {
+    "ru": "Давайте сверим, всё ли верно:",
+    "uz": "Keling, hammasi to'g'riligini tekshirib olaylik:",
+    "en": "Let me confirm everything is correct:",
+}
+
+BRIEF_SUMMARY_ASK = {
+    "ru": "Подтверждаете все данные?",
+    "uz": "Barcha ma'lumotlarni tasdiqlaysizmi?",
+    "en": "Do you confirm all these details?",
+}
+
+BRIEF_FIELD_LABELS = {
+    "ru": {
+        "service": "Услуга",
+        "niche": "Ниша / бизнес",
+        "deadline": "Срок",
+        "budget_hint": "Бюджет",
+        "contact": "Контакт",
+        "links": "Ссылки",
+        "summary": "Суть",
+    },
+    "uz": {
+        "service": "Xizmat",
+        "niche": "Soha / biznes",
+        "deadline": "Muddat",
+        "budget_hint": "Byudjet",
+        "contact": "Kontakt",
+        "links": "Havolalar",
+        "summary": "Mohiyat",
+    },
+    "en": {
+        "service": "Service",
+        "niche": "Niche / business",
+        "deadline": "Deadline",
+        "budget_hint": "Budget",
+        "contact": "Contact",
+        "links": "Links",
+        "summary": "Summary",
+    },
+}
+
+CONFIRM_YES_BTN = {
+    "ru": "Да, подтверждаю",
+    "uz": "Ha, tasdiqlayman",
+    "en": "Yes, I confirm",
+}
+
+CONFIRM_EDIT_BTN = {
+    "ru": "Нужно поправить",
+    "uz": "Tuzatish kerak",
+    "en": "I need to correct something",
+}
+
 LEAD_CONFIRM_USER = {
-    "ru": f"Отлично, все детали у меня. Следующий шаг - смета и план работ: Денис свяжется с вами в ближайшее время. "
-          f"Хотите быстрее - наберите его сами: {CONTACT_PHONE}. А я на связи, если появятся вопросы.",
-    "uz": f"Ajoyib, barcha tafsilotlar menda. Keyingi qadam - smeta va ish rejasi: Denis tez orada siz bilan bog'lanadi. "
-          f"Tezroq xohlasangiz - o'zingiz qo'ng'iroq qiling: {CONTACT_PHONE}. Savollar bo'lsa, men shu yerdaman.",
-    "en": f"Great, I have all the details. Next step is the quote and work plan: Denis will contact you shortly. "
-          f"Want it faster - call him directly: {CONTACT_PHONE}. And I'm here if you have more questions.",
+    "ru": f"Спасибо, данные принял. Денис свяжется с вами в ближайшее время по смете и плану работ. "
+          f"Если удобнее сразу: {CONTACT_PHONE}. Я на связи, если появятся вопросы.",
+    "uz": f"Rahmat, ma'lumotlarni qabul qildim. Denis smeta va ish rejasi bo'yicha tez orada siz bilan bog'lanadi. "
+          f"Darhol qulayroq bo'lsa: {CONTACT_PHONE}. Savollar bo'lsa, men shu yerdaman.",
+    "en": f"Thank you, I've recorded the details. Denis will contact you shortly about the quote and work plan. "
+          f"If it's easier to reach him now: {CONTACT_PHONE}. I'm here if you have more questions.",
+}
+
+BRIEF_EDIT_REPLY = {
+    "ru": "Хорошо. Напишите, что поправить - и сверим ещё раз.",
+    "uz": "Yaxshi. Nima tuzatish kerakligini yozing - keyin yana tekshirib chiqamiz.",
+    "en": "Of course. Tell me what to correct - and we'll review again.",
 }

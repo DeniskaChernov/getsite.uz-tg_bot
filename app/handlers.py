@@ -19,6 +19,7 @@ from aiogram.types import (
 )
 
 from app import texts
+from app.brief_flow import format_brief_summary, is_confirmation, is_edit_request
 from app.config import config
 from app.leads import send_lead
 from app.llm import (
@@ -51,6 +52,13 @@ def _quick_kb(lang: str) -> InlineKeyboardMarkup:
 def _lang_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t, callback_data=cb)] for t, cb in texts.LANG_BUTTONS
+    ])
+
+
+def _confirm_kb(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=texts.CONFIRM_YES_BTN[lang], callback_data="brief_yes")],
+        [InlineKeyboardButton(text=texts.CONFIRM_EDIT_BTN[lang], callback_data="brief_edit")],
     ])
 
 
@@ -193,6 +201,26 @@ async def cb_quick(query: CallbackQuery, bot: Bot, storage: BotStorage):
     await _dialog_turn(bot, storage, query.from_user.id, query.message.chat.id, user_text, lang)
 
 
+@router.callback_query(F.data == "brief_yes")
+async def cb_brief_yes(query: CallbackQuery, bot: Bot, storage: BotStorage):
+    user = await storage.get_user(query.from_user.id)
+    lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
+    await query.answer()
+    await _finalize_confirmed_lead(bot, storage, query.from_user.id, query.message.chat.id, lang)
+
+
+@router.callback_query(F.data == "brief_edit")
+async def cb_brief_edit(query: CallbackQuery, storage: BotStorage):
+    user = await storage.get_user(query.from_user.id)
+    lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
+    await query.answer()
+    brief = await storage.get_brief(query.from_user.id)
+    brief.pop("_awaiting_confirm", None)
+    await storage.save_brief(query.from_user.id, brief)
+    await query.message.answer(texts.BRIEF_EDIT_REPLY[lang])
+    await storage.add_message(query.from_user.id, "assistant", texts.BRIEF_EDIT_REPLY[lang])
+
+
 # --- контакт (шаг регистрации: телефон) ---
 
 @router.message(F.chat.type == ChatType.PRIVATE, F.contact)
@@ -296,7 +324,26 @@ async def on_text(message: Message, bot: Bot, storage: BotStorage):
 
 async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int,
                        user_text: str, lang: str) -> None:
-    """Один ход диалога: LLM-ответ + детерминированная проверка готовности брифа."""
+    """Один ход диалога: LLM-ответ + сводка брифа → подтверждение → лид."""
+    brief = await storage.get_brief(user_id)
+
+    # Уже ждём подтверждения сводки: да → лид, нет/правка → продолжаем сбор
+    if brief.get("_awaiting_confirm") and not brief.get("_lead_sent"):
+        if is_confirmation(user_text):
+            await storage.add_message(user_id, "user", user_text)
+            await _finalize_confirmed_lead(bot, storage, user_id, chat_id, lang)
+            return
+        if is_edit_request(user_text):
+            await storage.add_message(user_id, "user", user_text)
+            brief.pop("_awaiting_confirm", None)
+            await storage.save_brief(user_id, brief)
+            await bot.send_message(chat_id, texts.BRIEF_EDIT_REPLY[lang])
+            await storage.add_message(user_id, "assistant", texts.BRIEF_EDIT_REPLY[lang])
+            return
+        # Клиент пишет что-то ещё - снимаем ожидание и продолжаем диалог
+        brief.pop("_awaiting_confirm", None)
+        await storage.save_brief(user_id, brief)
+
     await storage.add_message(user_id, "user", user_text)
 
     if not limiter.check_global():
@@ -342,8 +389,9 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
     await storage.add_message(user_id, "assistant", reply)
     await bot.send_message(chat_id, reply)
 
-    # Детерминированная передача лида: извлекаем бриф кодом, не моделью
-    if brief.get("_lead_sent"):
+    # Когда бриф собран - показываем сводку и ждём явного подтверждения.
+    # Лид уходит только после "Да, подтверждаю".
+    if brief.get("_lead_sent") or brief.get("_awaiting_confirm"):
         return
     fresh_history = await storage.history(user_id, limit=50)
     user_msg_count = sum(1 for m in fresh_history if m["role"] == "user")
@@ -352,8 +400,24 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
         merged = {**brief, **{k: v for k, v in extracted.items() if v}}
         await storage.save_brief(user_id, merged)
         if brief_is_complete(merged, user_msg_count):
-            merged["_lead_sent"] = True
+            merged["_awaiting_confirm"] = True
             await storage.save_brief(user_id, merged)
-            await storage.log_event("brief_done", user_id)
-            await send_lead(bot, storage, user_id)
-            await bot.send_message(chat_id, texts.LEAD_CONFIRM_USER[lang])
+            summary = format_brief_summary(merged, lang)
+            await bot.send_message(chat_id, summary, reply_markup=_confirm_kb(lang))
+            await storage.add_message(user_id, "assistant", summary)
+            await storage.log_event("brief_ready", user_id)
+
+
+async def _finalize_confirmed_lead(bot: Bot, storage: BotStorage, user_id: int,
+                                   chat_id: int, lang: str) -> None:
+    brief = await storage.get_brief(user_id)
+    if brief.get("_lead_sent"):
+        await bot.send_message(chat_id, texts.LEAD_CONFIRM_USER[lang])
+        return
+    brief["_lead_sent"] = True
+    brief.pop("_awaiting_confirm", None)
+    await storage.save_brief(user_id, brief)
+    await storage.log_event("brief_done", user_id)
+    await send_lead(bot, storage, user_id)
+    await bot.send_message(chat_id, texts.LEAD_CONFIRM_USER[lang])
+    await storage.add_message(user_id, "assistant", texts.LEAD_CONFIRM_USER[lang])

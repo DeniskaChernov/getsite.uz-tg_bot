@@ -10,6 +10,7 @@ os.environ.setdefault("DB_PATH", "data/test.db")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from app.brief_flow import format_brief_summary, is_confirmation, is_edit_request
 from app.filters import output_violation, polish_reply
 from app.llm import brief_is_complete
 from app.prompt import build_system_prompt
@@ -42,12 +43,34 @@ def test_filters():
     assert output_violation("Передам все пожелания в макет") is None
 
 
+def test_confirmation_flow():
+    assert is_confirmation("да")
+    assert is_confirmation("Подтверждаю")
+    assert is_confirmation("yes")
+    assert is_confirmation("ha")
+    assert not is_confirmation("да, но бюджет другой")
+    assert is_edit_request("нужно поправить срок")
+    assert is_edit_request("это неверно")
+    brief = {
+        "service": "лендинг",
+        "niche": "кафе",
+        "deadline": "к марту",
+        "summary": "Нужен лендинг для кафе.",
+    }
+    summary = format_brief_summary(brief, "ru")
+    assert "Подтверждаете все данные?" in summary
+    assert "Услуга: лендинг" in summary
+    assert "—" not in summary
+
+
 def test_no_handoff_in_templates():
     from app.filters import output_violation as ov
     for d in (texts.LLM_FALLBACK_REPLY, texts.LEAD_CONFIRM_USER, texts.CONTACT_REPLY,
-              texts.FORGET_CONFIRM_USER, texts.START_NO_PAYLOAD):
+              texts.FORGET_CONFIRM_USER, texts.START_NO_PAYLOAD,
+              texts.BRIEF_SUMMARY_HEADER, texts.BRIEF_SUMMARY_ASK, texts.BRIEF_EDIT_REPLY):
         for lang, s in d.items():
             assert ov(s) is None, f"handoff phrase in template [{lang}]: {s[:60]}"
+    assert "Подтверждаете все данные?" in texts.BRIEF_SUMMARY_ASK["ru"]
 
 
 def test_polish():
@@ -64,7 +87,9 @@ def test_no_em_dash_in_templates():
               texts.LLM_FALLBACK_REPLY, texts.HELP_REPLY, texts.LEAD_CONFIRM_USER,
               texts.FORGET_CONFIRM_USER, texts.RATE_LIMIT_REPLY,
               texts.ASK_NAME, texts.ASK_PHONE, texts.REG_DONE_PREFIX,
-              texts.WELCOME_BACK, texts.NAME_TOO_LONG):
+              texts.WELCOME_BACK, texts.NAME_TOO_LONG,
+              texts.BRIEF_SUMMARY_HEADER, texts.BRIEF_SUMMARY_ASK,
+              texts.BRIEF_EDIT_REPLY, texts.CONFIRM_YES_BTN, texts.CONFIRM_EDIT_BTN):
         for lang, s in d.items():
             assert "—" not in s and "–" not in s, f"em dash in template [{lang}]: {s[:40]}"
     for lang in ("ru", "uz", "en"):
@@ -139,6 +164,7 @@ async def test_storage():
 def main():
     test_payloads()
     test_filters()
+    test_confirmation_flow()
     test_no_handoff_in_templates()
     test_polish()
     test_no_em_dash_in_templates()
