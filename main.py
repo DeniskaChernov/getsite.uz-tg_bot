@@ -15,6 +15,7 @@ from aiohttp import web
 
 from app import admin, handlers
 from app.config import config
+from app.followups import followup_loop
 from app.storage import BotStorage, create_storage
 
 logging.basicConfig(
@@ -66,6 +67,7 @@ async def run_polling(bot: Bot, dp: Dispatcher, storage: BotStorage) -> None:
     await bot.delete_webhook(drop_pending_updates=True)
     log.info("Starting in POLLING mode (dev only)")
     asyncio.create_task(daily_maintenance(storage))
+    asyncio.create_task(followup_loop(bot, storage))
     await dp.start_polling(bot, allowed_updates=ALLOWED_UPDATES)
 
 
@@ -91,6 +93,7 @@ async def run_webhook(bot: Bot, dp: Dispatcher, storage: BotStorage) -> None:
     log.info("Webhook set, starting server on port %s", config.port)
 
     asyncio.create_task(daily_maintenance(storage))
+    asyncio.create_task(followup_loop(bot, storage))
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=config.port)

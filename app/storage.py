@@ -49,6 +49,8 @@ class BotStorage(Protocol):
     async def purge_old_history(self) -> int: ...
     async def claim_lead(self, user_id: int) -> bool: ...
     async def reset_lead_flags(self, user_id: int) -> None: ...
+    async def list_followup_candidates(self, silent_after_sec: int, max_followups: int = 2) -> list[dict]: ...
+    async def mark_followup_sent(self, user_id: int) -> None: ...
 
 
 def create_storage() -> BotStorage:
@@ -229,6 +231,8 @@ class PgStorage:
             return
         brief.pop("_lead_sent", None)
         brief.pop("_awaiting_confirm", None)
+        brief.pop("_followup_count", None)
+        brief.pop("_last_followup_at", None)
         await self.save_brief(user_id, brief)
 
     async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int:
@@ -276,6 +280,52 @@ class PgStorage:
         async with self._pool.acquire() as conn:
             for table in ("bot_messages", "bot_briefs", "bot_leads", "bot_events", "bot_users"):
                 await conn.execute(f"DELETE FROM {table} WHERE user_id = $1", user_id)
+
+    async def list_followup_candidates(self, silent_after_sec: int, max_followups: int = 2) -> list[dict]:
+        """Клиенты, у которых последнее сообщение - от бота, и тишина дольше silent_after_sec."""
+        cutoff = int(time.time()) - silent_after_sec
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT u.user_id, u.lang, u.name, b.data AS brief_data, last.created_at AS last_at, last.role AS last_role
+                FROM bot_users u
+                JOIN LATERAL (
+                    SELECT role, created_at FROM bot_messages
+                    WHERE user_id = u.user_id ORDER BY id DESC LIMIT 1
+                ) last ON TRUE
+                LEFT JOIN bot_briefs b ON b.user_id = u.user_id
+                WHERE u.reg_state = 'done' AND u.muted = FALSE
+                  AND last.role = 'assistant' AND last.created_at <= $1
+                """,
+                cutoff,
+            )
+        out = []
+        for r in rows:
+            brief = json.loads(r["brief_data"]) if r["brief_data"] else {}
+            if brief.get("_lead_sent"):
+                continue
+            count = int(brief.get("_followup_count") or 0)
+            if count >= max_followups:
+                continue
+            last_fu = int(brief.get("_last_followup_at") or 0)
+            # Второе напоминание - не раньше чем через 24ч после первого
+            if count >= 1 and int(time.time()) - last_fu < 86400:
+                continue
+            out.append({
+                "user_id": r["user_id"],
+                "lang": r["lang"] or "ru",
+                "name": r["name"],
+                "brief": brief,
+                "awaiting_confirm": bool(brief.get("_awaiting_confirm")),
+                "followup_count": count,
+            })
+        return out
+
+    async def mark_followup_sent(self, user_id: int) -> None:
+        brief = await self.get_brief(user_id)
+        brief["_followup_count"] = int(brief.get("_followup_count") or 0) + 1
+        brief["_last_followup_at"] = int(time.time())
+        await self.save_brief(user_id, brief)
 
     async def purge_old_history(self) -> int:
         cutoff = int(time.time()) - RETENTION_DAYS * 86400
@@ -466,6 +516,8 @@ class SqliteStorage:
             return
         brief.pop("_lead_sent", None)
         brief.pop("_awaiting_confirm", None)
+        brief.pop("_followup_count", None)
+        brief.pop("_last_followup_at", None)
         await self.save_brief(user_id, brief)
 
     async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int:
@@ -517,6 +569,50 @@ class SqliteStorage:
         for table in ("bot_messages", "bot_briefs", "bot_leads", "bot_events", "bot_users"):
             await self._db.execute(f"DELETE FROM {table} WHERE user_id=?", (user_id,))
         await self._db.commit()
+
+    async def list_followup_candidates(self, silent_after_sec: int, max_followups: int = 2) -> list[dict]:
+        cutoff = int(time.time()) - silent_after_sec
+        async with self._db.execute(
+            """
+            SELECT u.user_id, u.lang, u.name, b.data AS brief_data, m.role AS last_role, m.created_at AS last_at
+            FROM bot_users u
+            JOIN (
+                SELECT user_id, role, created_at FROM bot_messages
+                WHERE id IN (SELECT MAX(id) FROM bot_messages GROUP BY user_id)
+            ) m ON m.user_id = u.user_id
+            LEFT JOIN bot_briefs b ON b.user_id = u.user_id
+            WHERE u.reg_state = 'done' AND u.muted = 0
+              AND m.role = 'assistant' AND m.created_at <= ?
+            """,
+            (cutoff,),
+        ) as cur:
+            rows = await cur.fetchall()
+        out = []
+        for r in rows:
+            brief = json.loads(r["brief_data"]) if r["brief_data"] else {}
+            if brief.get("_lead_sent"):
+                continue
+            count = int(brief.get("_followup_count") or 0)
+            if count >= max_followups:
+                continue
+            last_fu = int(brief.get("_last_followup_at") or 0)
+            if count >= 1 and int(time.time()) - last_fu < 86400:
+                continue
+            out.append({
+                "user_id": r["user_id"],
+                "lang": r["lang"] or "ru",
+                "name": r["name"],
+                "brief": brief,
+                "awaiting_confirm": bool(brief.get("_awaiting_confirm")),
+                "followup_count": count,
+            })
+        return out
+
+    async def mark_followup_sent(self, user_id: int) -> None:
+        brief = await self.get_brief(user_id)
+        brief["_followup_count"] = int(brief.get("_followup_count") or 0) + 1
+        brief["_last_followup_at"] = int(time.time())
+        await self.save_brief(user_id, brief)
 
     async def purge_old_history(self) -> int:
         cutoff = int(time.time()) - RETENTION_DAYS * 86400

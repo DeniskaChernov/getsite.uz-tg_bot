@@ -14,13 +14,14 @@ from openai import AsyncOpenAI
 
 from app.config import config
 from app.filters import output_violation, polish_reply
-from app.prompt import BRIEF_EXTRACTOR_PROMPT, build_system_prompt
+from app.prompt import BRIEF_EXTRACTOR_PROMPT, build_system_prompt, infer_dialog_stage
 
 log = logging.getLogger(__name__)
 
 LLM_TIMEOUT = 30
 MAX_INPUT_CHARS = 2000
-HISTORY_LIMIT = 20
+HISTORY_LIMIT = 28
+
 
 _client: AsyncOpenAI | None = None
 
@@ -48,12 +49,13 @@ class LLMFiltered(Exception):
 
 async def generate_reply(user_id: int, history: list[dict[str, str]],
                          service_name: str | None, lang: str, brief_state: str,
-                         client_name: str | None = None) -> str:
+                         client_name: str | None = None,
+                         dialog_stage: str | None = None) -> str:
     lock = _user_locks[user_id]
     if lock.locked():
         raise LLMBusy
     async with lock:
-        system = build_system_prompt(service_name, lang, brief_state, client_name)
+        system = build_system_prompt(service_name, lang, brief_state, client_name, dialog_stage)
         messages = [{"role": "system", "content": system}, *history[-HISTORY_LIMIT:]]
         resp = await asyncio.wait_for(
             _get_client().chat.completions.create(

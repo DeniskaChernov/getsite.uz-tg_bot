@@ -30,6 +30,7 @@ from app.llm import (
     extract_brief,
     generate_reply,
 )
+from app.prompt import infer_dialog_stage
 from app.ratelimit import limiter
 from app.services import resolve_payload
 from app.storage import REG_DONE, REG_NEED_LANG, REG_NEED_NAME, REG_NEED_PHONE, BotStorage
@@ -395,6 +396,8 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
     brief_state = ", ".join(f"{k}: {v}" for k, v in brief.items()
                             if v and not k.startswith("_")) or "пусто"
     history = await storage.history(user_id)
+    user_msg_count = sum(1 for m in history if m["role"] == "user")
+    stage = infer_dialog_stage(brief, user_msg_count)
 
     try:
         await bot.send_chat_action(chat_id, "typing")
@@ -403,6 +406,7 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
             svc.name_ru if svc.payload != "discuss" else None,
             lang, brief_state,
             client_name=(user.get("name") if user else None),
+            dialog_stage=stage,
         )
     except LLMBusy:
         await bot.send_message(chat_id, texts.RATE_LIMIT_REPLY[lang])

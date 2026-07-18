@@ -260,3 +260,22 @@ BRIEF_EDIT_REPLY = {
     "uz": "Yaxshi. Nima tuzatish kerakligini yozing - keyin yana tekshirib chiqamiz.",
     "en": "Of course. Tell me what to correct - and we'll review again.",
 }
+
+# Мягкие напоминания, если клиент замолчал
+FOLLOWUP_FIRST = {
+    "ru": "Здравствуйте{name_part}! Если удобно продолжить - напишите, чем могу помочь по задаче. Я на связи.",
+    "uz": "Assalomu alaykum{name_part}! Davom ettirish qulay bo'lsa - vazifa bo'yicha yozing. Men shu yerdaman.",
+    "en": "Hello{name_part}! If you'd like to continue, just write about your task. I'm here.",
+}
+
+FOLLOWUP_SECOND = {
+    "ru": "На всякий случай ещё раз: если проект актуален - напишите, сориентирую по шагам. Если нет - ничего страшного.",
+    "uz": "Yana bir bor eslataman: loyiha dolzarb bo'lsa - yozing, qadamlarni aytib beraman. Bo'lmasa - hech qisi yo'q.",
+    "en": "Just checking in: if the project is still relevant, write and I'll outline the next steps. If not - no worries.",
+}
+
+FOLLOWUP_CONFIRM = {
+    "ru": "Напомню: выше сводка по вашим данным. Если всё верно - подтвердите, пожалуйста. Если нужно поправить - напишите что именно.",
+    "uz": "Eslatma: yuqorida ma'lumotlaringiz xulosasi bor. Hammasi to'g'ri bo'lsa - tasdiqlang. Tuzatish kerak bo'lsa - nima ekanini yozing.",
+    "en": "A reminder: the summary of your details is above. If everything looks right - please confirm. If something needs fixing - tell me what.",
+}

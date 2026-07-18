@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.brief_flow import format_brief_summary, is_confirmation, is_edit_request
 from app.filters import output_violation, polish_reply
 from app.llm import brief_is_complete
-from app.prompt import build_system_prompt
+from app.prompt import build_system_prompt, infer_dialog_stage
 from app.services import SERVICES, resolve_payload
 from app.storage import Storage
 from app import texts
@@ -109,10 +109,18 @@ def test_texts():
 
 
 def test_prompt():
-    p = build_system_prompt("Лендинг", "ru", "ниша: кафе", "Алишер")
+    p = build_system_prompt("Лендинг", "ru", "ниша: кафе", "Алишер", "уточнение задачи")
     assert "Лендинг" in p and "ниша: кафе" in p and "Алишер" in p
+    assert "уточнение задачи" in p
+    assert "ПОНИМАНИЕ КЛИЕНТА" in p
     assert 'на "вы"' in p
     assert "{" not in p  # все плейсхолдеры подставлены
+
+
+def test_dialog_stage():
+    assert "знакомство" in infer_dialog_stage({}, 1)
+    assert "уточнение" in infer_dialog_stage({"service": "лендинг"}, 3)
+    assert "подтверждения" in infer_dialog_stage({"service": "x"}, 5, awaiting_confirm=True)
 
 
 def test_brief_state():
@@ -177,6 +185,7 @@ def main():
     test_no_em_dash_in_templates()
     test_texts()
     test_prompt()
+    test_dialog_stage()
     test_brief_state()
     asyncio.run(test_storage())
     # Импорт хендлеров и main — проверка, что всё собирается
