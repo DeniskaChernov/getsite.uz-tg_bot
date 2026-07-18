@@ -22,11 +22,11 @@ SERVICES: dict[str, Service] = {
     s.payload: s
     for s in [
         Service("discuss", "Обсудить проект", "Loyihani muhokama qilish", "Discuss a project", "", "", ""),
-        Service("sites_landing", "Лендинг", "Lending sahifa", "Landing page",
+        Service("sites_landing", "Лендинг", "Landing sahifa", "Landing page",
                 "от 4,9 млн сум", "4,9 mln so'mdan", "from 4.9M UZS"),
         Service("sites_corporate", "Корпоративный сайт", "Korporativ sayt", "Corporate website",
                 "от 8,9 млн сум", "8,9 mln so'mdan", "from 8.9M UZS"),
-        Service("sites_catalog", "Сайт-каталог", "Katalog sayt", "Catalog website",
+        Service("sites_catalog", "Сайт-каталог", "Katalog-sayt", "Catalog website",
                 "от 11,9 млн сум", "11,9 mln so'mdan", "from 11.9M UZS"),
         Service("sites_shop", "Интернет-магазин", "Internet-do'kon", "Online store",
                 "от 14,9 млн сум", "14,9 mln so'mdan", "from 14.9M UZS"),
@@ -36,7 +36,7 @@ SERVICES: dict[str, Service] = {
                 "от 9,9 млн сум", "9,9 mln so'mdan", "from 9.9M UZS"),
         Service("tg_miniapp", "Telegram Mini App", "Telegram Mini App", "Telegram Mini App",
                 "от 18 млн сум", "18 mln so'mdan", "from 18M UZS"),
-        Service("auto_analytics", "Аналитика и проектирование", "Analitika va loyihalash", "Analytics & design",
+        Service("auto_analytics", "Аналитика и проектирование", "Tahlil va loyihalash", "Analytics & design",
                 "от 1,9 млн сум", "1,9 mln so'mdan", "from 1.9M UZS"),
         Service("auto_process", "Автоматизация процесса", "Jarayonni avtomatlashtirish", "Process automation",
                 "от 3 млн сум", "3 mln so'mdan", "from 3M UZS"),
@@ -46,7 +46,7 @@ SERVICES: dict[str, Service] = {
                 "от 20 млн сум", "20 mln so'mdan", "from 20M UZS"),
         Service("auto_crm", "CRM с нуля", "Noldan CRM", "Custom CRM",
                 "от 25 млн сум", "25 mln so'mdan", "from 25M UZS"),
-        Service("support_maint", "Техническое сопровождение", "Texnik qo'llab-quvvatlash", "Maintenance",
+        Service("support_maint", "Техническое сопровождение", "Texnik qo'llab-quvvatlash", "Technical support",
                 "от 700 тыс сум/мес", "oyiga 700 ming so'mdan", "from 700K UZS/mo"),
     ]
 }

@@ -49,9 +49,19 @@ def test_confirmation_flow():
     assert is_confirmation("Подтверждаю")
     assert is_confirmation("yes")
     assert is_confirmation("ha")
+    assert is_confirmation("ДА")
+    assert is_confirmation("to'g'ri")
+    assert is_confirmation("togri")
+    assert is_confirmation("tasdiqlayman")
+    assert is_confirmation("ҳа")
+    assert is_confirmation("da")
+    assert is_confirmation("verno")
+    assert is_confirmation("ок")
     assert not is_confirmation("да, но бюджет другой")
     assert is_edit_request("нужно поправить срок")
     assert is_edit_request("это неверно")
+    assert is_edit_request("tuzatish kerak")
+    assert is_edit_request("noto'g'ri")
     brief = {
         "service": "лендинг",
         "niche": "кафе",
@@ -62,6 +72,23 @@ def test_confirmation_flow():
     assert "Подтверждаете все данные?" in summary
     assert "Услуга: лендинг" in summary
     assert "—" not in summary
+
+
+def test_lang_script():
+    from app.lang import detect_lang_from_text, fold_text, lang_label, script_hint
+    assert fold_text("  Привёт  ") == "привет"
+    assert "кириллица" in script_hint("Нужен сайт")
+    assert "латиница" in script_hint("nuzhen sayt")
+    assert "транслит" in script_hint("skolko stoit landing")
+    assert "узбекский" in script_hint("narx qancha?")
+    assert detect_lang_from_text("Assalomu alaykum, sayt kerak") == "uz"
+    assert detect_lang_from_text("Hello, I need a website") == "en"
+    assert detect_lang_from_text("skolko stoit sayt") == "ru"
+    assert "транслит" in lang_label("ru") or "русский" in lang_label("ru")
+    p = build_system_prompt("Лендинг", "uz", "пусто", script_hint="латиница, узбекский (латиница)")
+    assert "o'zbek" in p.lower() or "lotin" in p.lower()
+    assert "латиница" in p
+    assert "ЯЗЫК И ПИСЬМЕННОСТЬ" in p
 
 
 def test_no_handoff_in_templates():
@@ -129,6 +156,7 @@ def test_prompt():
     assert "уточнение задачи" in p
     assert "ПОНИМАНИЕ КЛИЕНТА" in p
     assert 'на "вы"' in p
+    assert "ЯЗЫК И ПИСЬМЕННОСТЬ" in p
     assert "{" not in p  # все плейсхолдеры подставлены
 
 
@@ -209,6 +237,7 @@ def main():
     test_payloads()
     test_filters()
     test_confirmation_flow()
+    test_lang_script()
     test_no_handoff_in_templates()
     test_polish()
     test_no_denis_in_templates()

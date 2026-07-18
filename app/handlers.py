@@ -31,6 +31,7 @@ from app.llm import (
     generate_reply,
 )
 from app.prompt import infer_dialog_stage
+from app.lang import script_hint
 from app.ratelimit import limiter
 from app.refs import extract_urls_from_message, merge_links_into_brief, note_media_in_brief
 from app.services import resolve_payload
@@ -40,7 +41,10 @@ log = logging.getLogger(__name__)
 router = Router()
 
 _FORGET_RE = re.compile(
-    r"(удали(те)?\s+мои\s+данные|delete\s+my\s+data|ma'?lumotlarimni\s+o'?chir)", re.IGNORECASE
+    r"(удали(те)?\s+мои\s+данные|delete\s+my\s+data|"
+    r"ma'?lumotlarimni\s+o'?chir|маълумотларимни\s+ўчир|"
+    r"forget\s+me|удали\s+меня)",
+    re.IGNORECASE,
 )
 _PHONE_DIGITS_RE = re.compile(r"\d")
 
@@ -438,6 +442,7 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
     history = await storage.history(user_id)
     user_msg_count = sum(1 for m in history if m["role"] == "user")
     stage = infer_dialog_stage(brief, user_msg_count)
+    hint = script_hint(user_text)
 
     try:
         await bot.send_chat_action(chat_id, "typing")
@@ -447,6 +452,7 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
             lang, brief_state,
             client_name=(user.get("name") if user else None),
             dialog_stage=stage,
+            script_hint=hint,
         )
     except LLMBusy:
         await bot.send_message(chat_id, texts.RATE_LIMIT_REPLY[lang])

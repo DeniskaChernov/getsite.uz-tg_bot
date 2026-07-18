@@ -50,12 +50,15 @@ class LLMFiltered(Exception):
 async def generate_reply(user_id: int, history: list[dict[str, str]],
                          service_name: str | None, lang: str, brief_state: str,
                          client_name: str | None = None,
-                         dialog_stage: str | None = None) -> str:
+                         dialog_stage: str | None = None,
+                         script_hint: str | None = None) -> str:
     lock = _user_locks[user_id]
     if lock.locked():
         raise LLMBusy
     async with lock:
-        system = build_system_prompt(service_name, lang, brief_state, client_name, dialog_stage)
+        system = build_system_prompt(
+            service_name, lang, brief_state, client_name, dialog_stage, script_hint,
+        )
         messages = [{"role": "system", "content": system}, *history[-HISTORY_LIMIT:]]
         resp = await asyncio.wait_for(
             _get_client().chat.completions.create(
