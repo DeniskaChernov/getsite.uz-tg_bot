@@ -53,15 +53,28 @@ async def cmd_stats(message: Message, storage: BotStorage):
     starts = sum(s["starts_by_payload"].values())
     by_payload = "\n".join(f"  {p}: {c}" for p, c in
                            sorted(s["starts_by_payload"].items(), key=lambda x: -x[1])) or "  -"
+    f = s.get("funnel") or {}
+    fs = int(f.get("starts") or 0)
+
+    def pct(n: int) -> str:
+        if not fs:
+            return "-"
+        return f"{round(100 * n / fs)}%"
+
     await message.answer(
         f"📊 За 7 дней:\n"
-        f"Стартов: {starts}\n{by_payload}\n"
-        f"Регистраций: {events.get('registered', 0)}\n"
-        f"Брифов к подтверждению: {events.get('brief_ready', 0)}\n"
-        f"Брифов собрано: {events.get('brief_done', 0)}\n"
-        f"Лидов передано: {s['leads']}\n"
+        f"Стартов (события): {starts}\n{by_payload}\n\n"
+        f"Воронка (уник. пользователи):\n"
+        f"  Старт: {f.get('starts', 0)}\n"
+        f"  Регистрация: {f.get('registered', 0)} ({pct(int(f.get('registered') or 0))})\n"
+        f"  Сводка к подтверждению: {f.get('brief_ready', 0)} ({pct(int(f.get('brief_ready') or 0))})\n"
+        f"  Подтвердили бриф: {f.get('brief_done', 0)} ({pct(int(f.get('brief_done') or 0))})\n"
+        f"  Лиды: {f.get('leads', 0)} ({pct(int(f.get('leads') or 0))})\n\n"
+        f"События: followup={events.get('followup', 0)}, "
+        f"ссылки={events.get('link_saved', 0)}, "
+        f"удаления={events.get('forgotten', 0)}\n"
         f"Ошибок LLM: {events.get('llm_error', 0)}\n"
-        f"Срабатываний фильтра: {events.get('filter_hit', 0)}"
+        f"Фильтров: {events.get('filter_hit', 0)}"
     )
 
 

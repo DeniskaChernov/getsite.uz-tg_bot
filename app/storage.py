@@ -288,6 +288,23 @@ class PgStorage:
             out["starts_by_payload"] = {r["p"]: r["c"] for r in rows}
             out["leads"] = await conn.fetchval(
                 "SELECT COUNT(*) FROM bot_leads WHERE created_at >= $1", since)
+            # уникальные пользователи на этапах воронки
+            out["funnel"] = {
+                "starts": await conn.fetchval(
+                    "SELECT COUNT(DISTINCT user_id) FROM bot_events "
+                    "WHERE kind = 'start' AND created_at >= $1 AND user_id IS NOT NULL", since) or 0,
+                "registered": await conn.fetchval(
+                    "SELECT COUNT(DISTINCT user_id) FROM bot_events "
+                    "WHERE kind = 'registered' AND created_at >= $1 AND user_id IS NOT NULL", since) or 0,
+                "brief_ready": await conn.fetchval(
+                    "SELECT COUNT(DISTINCT user_id) FROM bot_events "
+                    "WHERE kind = 'brief_ready' AND created_at >= $1 AND user_id IS NOT NULL", since) or 0,
+                "brief_done": await conn.fetchval(
+                    "SELECT COUNT(DISTINCT user_id) FROM bot_events "
+                    "WHERE kind = 'brief_done' AND created_at >= $1 AND user_id IS NOT NULL", since) or 0,
+                "leads": await conn.fetchval(
+                    "SELECT COUNT(DISTINCT user_id) FROM bot_leads WHERE created_at >= $1", since) or 0,
+            }
         return out
 
     async def forget_user(self, user_id: int) -> None:
@@ -599,6 +616,25 @@ class SqliteStorage:
             "SELECT COUNT(*) c FROM bot_leads WHERE created_at>=?", (since,)
         ) as cur:
             out["leads"] = (await cur.fetchone())["c"]
+
+        async def _uniq(kind: str) -> int:
+            async with self._db.execute(
+                "SELECT COUNT(DISTINCT user_id) c FROM bot_events "
+                "WHERE kind=? AND created_at>=? AND user_id IS NOT NULL", (kind, since)
+            ) as cur:
+                return (await cur.fetchone())["c"] or 0
+
+        async with self._db.execute(
+            "SELECT COUNT(DISTINCT user_id) c FROM bot_leads WHERE created_at>=?", (since,)
+        ) as cur:
+            leads_uniq = (await cur.fetchone())["c"] or 0
+        out["funnel"] = {
+            "starts": await _uniq("start"),
+            "registered": await _uniq("registered"),
+            "brief_ready": await _uniq("brief_ready"),
+            "brief_done": await _uniq("brief_done"),
+            "leads": leads_uniq,
+        }
         return out
 
     async def forget_user(self, user_id: int) -> None:

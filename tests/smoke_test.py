@@ -14,6 +14,7 @@ from app.brief_flow import format_brief_summary, is_confirmation, is_edit_reques
 from app.filters import output_violation, polish_reply
 from app.llm import brief_is_complete
 from app.prompt import build_system_prompt, infer_dialog_stage
+from app.refs import extract_urls_from_text
 from app.services import SERVICES, resolve_payload
 from app.storage import Storage
 from app import texts
@@ -102,7 +103,8 @@ def test_no_em_dash_in_templates():
               texts.ASK_NAME, texts.ASK_PHONE, texts.REG_DONE_PREFIX,
               texts.WELCOME_BACK, texts.NAME_TOO_LONG,
               texts.BRIEF_SUMMARY_HEADER, texts.BRIEF_SUMMARY_ASK,
-              texts.BRIEF_EDIT_REPLY, texts.CONFIRM_YES_BTN, texts.CONFIRM_EDIT_BTN):
+              texts.BRIEF_EDIT_REPLY, texts.CONFIRM_YES_BTN, texts.CONFIRM_EDIT_BTN,
+              texts.LINK_SAVED_REPLY, texts.MEDIA_REPLY):
         for lang, s in d.items():
             assert "—" not in s and "–" not in s, f"em dash in template [{lang}]: {s[:40]}"
     for lang in ("ru", "uz", "en"):
@@ -128,6 +130,13 @@ def test_prompt():
     assert "ПОНИМАНИЕ КЛИЕНТА" in p
     assert 'на "вы"' in p
     assert "{" not in p  # все плейсхолдеры подставлены
+
+
+def test_refs():
+    assert extract_urls_from_text("смотрите https://getsite.uz и https://cartello.uz/") == [
+        "https://getsite.uz", "https://cartello.uz/",
+    ]
+    assert extract_urls_from_text("без ссылок") == []
 
 
 def test_dialog_stage():
@@ -183,8 +192,12 @@ async def test_storage():
     await s.reset_lead_flags(42)
     assert not (await s.get_brief(42)).get("_lead_sent")
     await s.log_event("start", 42, "sites_landing")
+    await s.log_event("registered", 42)
+    await s.log_event("brief_ready", 42)
     stats = await s.stats()
     assert stats["starts_by_payload"]["sites_landing"] == 1
+    assert stats["funnel"]["starts"] >= 1
+    assert stats["funnel"]["registered"] >= 1
     await s.forget_user(42)
     assert await s.get_user(42) is None
     assert await s.history(42) == []
@@ -202,6 +215,7 @@ def main():
     test_no_em_dash_in_templates()
     test_texts()
     test_prompt()
+    test_refs()
     test_dialog_stage()
     test_brief_state()
     asyncio.run(test_storage())

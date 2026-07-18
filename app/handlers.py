@@ -32,6 +32,7 @@ from app.llm import (
 )
 from app.prompt import infer_dialog_stage
 from app.ratelimit import limiter
+from app.refs import extract_urls_from_message, merge_links_into_brief, note_media_in_brief
 from app.services import resolve_payload
 from app.storage import REG_DONE, REG_NEED_LANG, REG_NEED_NAME, REG_NEED_PHONE, BotStorage
 
@@ -277,12 +278,33 @@ async def _finish_registration(bot: Bot, storage: BotStorage, message: Message, 
 
 @router.message(F.chat.type == ChatType.PRIVATE,
                 F.photo | F.voice | F.video | F.document | F.audio | F.video_note)
-async def on_media(message: Message, storage: BotStorage):
+async def on_media(message: Message, bot: Bot, storage: BotStorage):
     if message.from_user.is_bot or message.forward_origin:
         return
     user = await storage.get_user(message.from_user.id)
+    if user and user.get("muted"):
+        return
     lang = user["lang"] if user else texts.normalize_lang(message.from_user.language_code)
+    if not user:
+        await storage.upsert_user(message.from_user.id, message.from_user.username,
+                                  message.from_user.first_name, lang)
+
+    kind = "фото" if message.photo else (
+        "документ" if message.document else (
+            "видео" if message.video else (
+                "голос" if message.voice or message.video_note else "файл")))
+    if user and user.get("reg_state") == REG_DONE:
+        await note_media_in_brief(storage, message.from_user.id, kind)
+        urls = extract_urls_from_message(message)
+        if urls:
+            await merge_links_into_brief(storage, message.from_user.id, urls)
+
     await message.answer(texts.MEDIA_REPLY[lang])
+    # Если в подписи есть текст без ссылки - можно продолжить диалог по caption
+    caption = (message.caption or "").strip()
+    if caption and user and user.get("reg_state") == REG_DONE and not extract_urls_from_message(message):
+        if not caption.startswith("/") and len(caption) <= MAX_INPUT_CHARS:
+            await _dialog_turn(bot, storage, message.from_user.id, message.chat.id, caption, lang)
 
 
 @router.message(F.chat.type == ChatType.PRIVATE, F.sticker)
@@ -345,6 +367,21 @@ async def on_text(message: Message, bot: Bot, storage: BotStorage):
         except Exception:
             log.error("Failed to notify admins about forget", exc_info=True)
         return
+
+    # Референс-ссылки: сохраняем в бриф; если сообщение - только URL, коротко подтверждаем
+    if user.get("reg_state") == REG_DONE:
+        urls = extract_urls_from_message(message)
+        if urls:
+            added = await merge_links_into_brief(storage, message.from_user.id, urls)
+            rest = text
+            for u in urls:
+                rest = rest.replace(u, "")
+            if added and not rest.strip():
+                await message.answer(texts.LINK_SAVED_REPLY[lang])
+                await storage.add_message(message.from_user.id, "user", text)
+                await storage.add_message(message.from_user.id, "assistant", texts.LINK_SAVED_REPLY[lang])
+                await storage.log_event("link_saved", message.from_user.id)
+                return
 
     if not limiter.check_user(message.from_user.id):
         await message.answer(texts.RATE_LIMIT_REPLY[lang])

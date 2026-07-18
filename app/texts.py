@@ -136,10 +136,20 @@ CONTACT_REPLY = {
 }
 
 MEDIA_REPLY = {
-    "ru": "Давайте пока текстом - файлы и примеры вы сможете показать уже менеджеру.",
-    "uz": "Hozircha matn bilan yozing - fayl va namunalarni keyin menejerga ko'rsatasiz.",
-    "en": "Let's stick to text for now - you can share files and examples with a manager later.",
+    "ru": "Принял. Если есть ссылка на сайт или пример - пришлите текстом, сохраню в заявку. "
+          "Файлы подробнее удобнее показать уже менеджеру.",
+    "uz": "Qabul qildim. Sayt yoki namuna havolasi bo'lsa - matn bilan yuboring, arizaga yozib qo'yaman. "
+          "Fayllarni batafsil menejerga ko'rsatish qulayroq.",
+    "en": "Got it. If you have a link to a site or example - send it as text and I'll save it to the request. "
+          "Files are easier to show a manager in detail later.",
 }
+
+LINK_SAVED_REPLY = {
+    "ru": "Ссылку сохранил в заявку. Расскажите ещё коротко, что в ней важно для вас?",
+    "uz": "Havolani arizaga yozib oldim. Unda siz uchun nima muhimligini qisqacha aytib bering?",
+    "en": "I've saved the link to your request. Briefly - what about it matters most to you?",
+}
+
 
 TOO_LONG_REPLY = {
     "ru": "Прочитал, отвечаю по сути.",
