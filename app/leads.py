@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from aiogram import Bot
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from app.brief_flow import ensure_brief_contact
 from app.config import config
 from app.services import resolve_payload
 from app.storage import BotStorage
@@ -20,9 +21,23 @@ def _esc(value: str | None) -> str:
     return html.escape(str(value) if value else "-")
 
 
+def _media_line(brief: dict) -> str:
+    notes = brief.get("_media_notes") or []
+    if isinstance(notes, list) and notes:
+        # фото, фото, документ → фото×2, документ×1
+        counts: dict[str, int] = {}
+        for n in notes:
+            counts[str(n)] = counts.get(str(n), 0) + 1
+        return ", ".join(f"{k}×{v}" if v > 1 else k for k, v in counts.items())
+    return ""
+
+
 def build_lead_snapshot(user: dict, brief: dict, msg_count: int, started_at: int | None) -> str:
     """Полный снимок заявки для bot_leads.snapshot (JSON) - удобно для CRM позже."""
     public_brief = {k: v for k, v in brief.items() if v and not str(k).startswith("_")}
+    media = _media_line(brief)
+    if media:
+        public_brief["media"] = media
     return json.dumps(
         {
             "user": {
@@ -44,7 +59,9 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     user = await storage.get_user(user_id)
     if not user:
         return None
-    brief = await storage.get_brief(user_id)
+    brief = ensure_brief_contact(await storage.get_brief(user_id), user)
+    await storage.save_brief(user_id, brief)
+
     payload = user.get("payload")
     service = brief.get("service") or resolve_payload(payload).name_ru
     summary = brief.get("summary") or "-"
@@ -60,6 +77,7 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     )
 
     contact_line = brief.get("contact") or "-"
+    media = _media_line(brief)
     card = (
         f"🟢 Новый лид #{lead_id}\n"
         f"Услуга: {_esc(service)} (payload: {_esc(payload)})\n"
@@ -71,13 +89,22 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
         f"Срок: {_esc(brief.get('deadline'))}\n"
         f"Бюджет: {_esc(brief.get('budget_hint'))}\n"
         f"Ссылки: {_esc(brief.get('links'))}\n"
+        f"Медиа: {_esc(media) if media else '-'}\n"
         f"Суть: {_esc(summary)}\n"
         f"Диалог: {msg_count} сообщений, начат {started_str}"
     )
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="Взял в работу", callback_data=f"lead_take:{lead_id}"),
-        InlineKeyboardButton(text="Спам", callback_data=f"lead_spam:{lead_id}"),
-    ]])
+    open_btn = (
+        InlineKeyboardButton(text="Открыть чат", url=f"https://t.me/{user['username']}")
+        if user.get("username")
+        else InlineKeyboardButton(text="Профиль", url=f"tg://user?id={user_id}")
+    )
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Взял в работу", callback_data=f"lead_take:{lead_id}"),
+            InlineKeyboardButton(text="Спам", callback_data=f"lead_spam:{lead_id}"),
+        ],
+        [open_btn],
+    ])
     try:
         await bot.send_message(config.admin_chat_id, card, reply_markup=kb, parse_mode="HTML")
         await storage.log_event("lead_sent", user_id, str(lead_id))

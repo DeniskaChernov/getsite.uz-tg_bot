@@ -198,6 +198,18 @@ FORGET_CONFIRM_USER = {
     "en": "Done. Your data has been removed from the bot. Send /start again to begin with a clean slate.",
 }
 
+PHONE_UPDATED = {
+    "ru": "Номер обновил, спасибо.",
+    "uz": "Raqamni yangilab oldim, rahmat.",
+    "en": "Phone number updated - thank you.",
+}
+
+CONTACT_NOT_YOURS = {
+    "ru": "Нужен ваш номер - поделитесь своим контактом или введите цифрами.",
+    "uz": "Sizning raqamingiz kerak - o'zingiznikini ulashing yoki raqam bilan yozing.",
+    "en": "Please share your own number, or type it in digits.",
+}
+
 BRIEF_SUMMARY_HEADER = {
     "ru": "Давайте сверим, всё ли верно:",
     "uz": "Keling, hammasi to'g'riligini tekshirib chiqaylik:",

@@ -19,7 +19,13 @@ from aiogram.types import (
 )
 
 from app import texts
-from app.brief_flow import format_brief_summary, is_confirmation, is_edit_request
+from app.brief_flow import (
+    confirm_keyboard,
+    ensure_brief_contact,
+    format_brief_summary,
+    is_confirmation,
+    is_edit_request,
+)
 from app.config import config
 from app.leads import send_lead
 from app.llm import (
@@ -62,10 +68,7 @@ def _lang_kb() -> InlineKeyboardMarkup:
 
 
 def _confirm_kb(lang: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=texts.CONFIRM_YES_BTN[lang], callback_data="brief_yes")],
-        [InlineKeyboardButton(text=texts.CONFIRM_EDIT_BTN[lang], callback_data="brief_edit")],
-    ])
+    return confirm_keyboard(lang)
 
 
 def _phone_kb(lang: str) -> ReplyKeyboardMarkup:
@@ -129,9 +132,9 @@ async def cmd_start(message: Message, bot: Bot, command: CommandObject, storage:
     await storage.log_event("start", message.from_user.id, svc.payload)
 
     # Зарегистрированный клиент: помним его, здороваемся по имени и сразу к делу.
-    # Сбрасываем флаги прошлого лида - можно начать новую заявку.
+    # Новая заявка - чистый бриф и история диалога (имя/телефон/язык сохраняются).
     if existing and existing.get("reg_state") == REG_DONE:
-        await storage.reset_lead_flags(message.from_user.id)
+        await storage.start_fresh_inquiry(message.from_user.id)
         prefix = texts.WELCOME_BACK[lang].format(name=existing.get("name") or existing.get("first_name") or "")
         await _service_greeting(bot, storage, message.from_user.id, message.chat.id, lang, prefix)
         return
@@ -164,6 +167,13 @@ async def cb_lang(query: CallbackQuery, bot: Bot, storage: BotStorage):
         await bot.send_message(query.message.chat.id, texts.LANG_CHANGED[lang])
         return
 
+    if user.get("reg_state") == REG_NEED_PHONE:
+        name = user.get("name") or query.from_user.first_name or ""
+        await bot.send_message(query.message.chat.id, texts.LANG_CHANGED[lang])
+        await bot.send_message(query.message.chat.id, texts.ASK_PHONE[lang].format(name=name),
+                               reply_markup=_phone_kb(lang))
+        return
+
     await storage.set_reg_state(query.from_user.id, REG_NEED_NAME)
     await bot.send_message(query.message.chat.id, texts.ASK_NAME[lang])
 
@@ -186,6 +196,17 @@ async def cmd_lang(message: Message, command: CommandObject, storage: BotStorage
     await storage.upsert_user(message.from_user.id, message.from_user.username,
                               message.from_user.first_name, lang)
     await storage.set_lang(message.from_user.id, lang)
+    user = await storage.get_user(message.from_user.id)
+    reg_state = (user or {}).get("reg_state") or REG_NEED_LANG
+    if reg_state == REG_NEED_NAME:
+        await message.answer(texts.LANG_CHANGED[lang])
+        await message.answer(texts.ASK_NAME[lang])
+        return
+    if reg_state == REG_NEED_PHONE:
+        name = (user or {}).get("name") or message.from_user.first_name or ""
+        await message.answer(texts.LANG_CHANGED[lang])
+        await message.answer(texts.ASK_PHONE[lang].format(name=name), reply_markup=_phone_kb(lang))
+        return
     await message.answer(texts.LANG_CHANGED[lang])
 
 
@@ -225,7 +246,12 @@ async def cb_brief_yes(query: CallbackQuery, bot: Bot, storage: BotStorage):
     brief = await storage.get_brief(query.from_user.id)
     # Старая кнопка после «Нужно поправить» или уже отправленный лид - игнор
     if brief.get("_lead_sent") or not brief.get("_awaiting_confirm"):
-        await query.answer("Сначала сверим актуальные данные" if lang == "ru" else "OK")
+        stale = {
+            "ru": "Сначала сверим актуальные данные",
+            "uz": "Avval joriy ma'lumotlarni tekshirib chiqaylik",
+            "en": "Let's review the current details first",
+        }
+        await query.answer(stale.get(lang, stale["ru"]))
         try:
             await query.message.edit_reply_markup(reply_markup=None)
         except Exception:
@@ -266,9 +292,17 @@ async def on_contact(message: Message, bot: Bot, storage: BotStorage):
     if not user:
         return
     lang = user["lang"]
-    if user.get("reg_state") == REG_NEED_PHONE and message.contact.user_id == message.from_user.id:
+    if message.contact.user_id != message.from_user.id:
+        await message.answer(texts.CONTACT_NOT_YOURS[lang], reply_markup=_phone_kb(lang)
+                             if user.get("reg_state") == REG_NEED_PHONE else ReplyKeyboardRemove())
+        return
+    if user.get("reg_state") == REG_NEED_PHONE:
         await storage.set_phone(message.from_user.id, message.contact.phone_number)
         await _finish_registration(bot, storage, message, lang)
+        return
+    if user.get("reg_state") == REG_DONE:
+        await storage.set_phone(message.from_user.id, message.contact.phone_number)
+        await message.answer(texts.PHONE_UPDATED[lang], reply_markup=ReplyKeyboardRemove())
 
 
 async def _finish_registration(bot: Bot, storage: BotStorage, message: Message, lang: str) -> None:
@@ -479,6 +513,7 @@ async def _dialog_turn(bot: Bot, storage: BotStorage, user_id: int, chat_id: int
     extracted = await extract_brief(fresh_history)
     if extracted:
         merged = {**brief, **{k: v for k, v in extracted.items() if v}}
+        merged = ensure_brief_contact(merged, user)
         await storage.save_brief(user_id, merged)
         if brief_is_complete(merged, user_msg_count):
             merged["_awaiting_confirm"] = True

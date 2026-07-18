@@ -11,6 +11,7 @@ import logging
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramBadRequest
 
+from app.brief_flow import confirm_keyboard
 from app import texts
 from app.storage import BotStorage
 
@@ -44,8 +45,9 @@ async def run_followups_once(bot: Bot, storage: BotStorage) -> int:
     for c in candidates:
         lang = c["lang"] if c["lang"] in ("ru", "uz", "en") else "ru"
         text = followup_text(lang, c.get("name"), c["awaiting_confirm"], c["followup_count"])
+        kb = confirm_keyboard(lang) if c["awaiting_confirm"] else None
         try:
-            await bot.send_message(c["user_id"], text)
+            await bot.send_message(c["user_id"], text, reply_markup=kb)
             await storage.add_message(c["user_id"], "assistant", text)
             await storage.mark_followup_sent(c["user_id"])
             await storage.log_event("followup", c["user_id"], str(c["followup_count"] + 1))

@@ -7,13 +7,24 @@ import re
 _TOKEN_RE = re.compile(r"\d{8,10}:[A-Za-z0-9_-]{35}")
 _API_KEY_RE = re.compile(r"\b(sk-[A-Za-z0-9_-]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36})\b")
 
-# Хардкод-фильтр на попытку принять оплату (см. раздел 4 ТЗ)
-_PAYMENT_RE = re.compile(r"(оплатите на карту|переведите|плата.?ж на карту|отправьте деньги|номер карты для оплаты)", re.IGNORECASE)
+# Попытка принять оплату (RU / EN / UZ)
+_PAYMENT_RE = re.compile(
+    r"(оплатите\s+на\s+карту|переведите\s+(на\s+карту|деньги)|плата.?ж\s+на\s+карту|"
+    r"отправьте\s+деньги|номер\s+карты\s+для\s+оплаты|"
+    r"pay\s+(to\s+)?(the\s+)?card|send\s+(me\s+)?money|wire\s+transfer|"
+    r"card\s+number\s+for\s+payment|payment\s+details\s+below|"
+    r"kartaga\s+to'?lang|pul\s+o'?tkazing|karta\s+raqami)",
+    re.IGNORECASE,
+)
 
 # Бот - продавец 24/7: не «передаёт вопросы» и не ссылается на график работы
 _HANDOFF_RE = re.compile(
-    r"(перед(ал|аю|ам)\s+(ваш\s+)?(вопрос|заявку|запрос)|рабоч(ий|ее|ем)\s+(день|время|дне)|"
-    r"в\s+рабочие\s+часы|график\s+работы|business\s+(day|hours)|ish\s+kunida)",
+    r"(перед(ал|аю|ам)\s+(ваш\s+)?(вопрос|заявку|запрос)|"
+    r"рабоч(ий|ее|ем)\s+(день|время|дне)|в\s+рабочие\s+часы|график\s+работы|"
+    r"business\s+(day|hours)|working\s+hours|office\s+hours|"
+    r"i('ll|\s+will)\s+(pass|forward|transfer)\s+(your\s+)?(question|request)|"
+    r"ish\s+kunida|ish\s+vaqtida|"
+    r"savolingizni\s+(uzat|ber)|arizangizni\s+uzat)",
     re.IGNORECASE,
 )
 
@@ -25,6 +36,7 @@ _PROMPT_LEAK_MARKERS = (
     "МИНИ-БРИФ (собери за 3-6 сообщений",
     "СТИЛЬ ПИСЬМА - САМОЕ ВАЖНОЕ",
     "ЭТАЛОН ТОНА",
+    "ЯЗЫК И ПИСЬМЕННОСТЬ",
 )
 
 

@@ -34,12 +34,16 @@ def test_filters():
     assert output_violation("Вот токен 123456789:AAAbbbCCCdddEEEfffGGGhhhIIIjjjKKKll") == "token_like_string"
     assert output_violation("ключ sk-abcdefghijklmnopqrstuvwxyz123456") == "api_key_like_string"
     assert output_violation("Оплатите на карту 8600...") == "payment_request"
+    assert output_violation("Please pay to the card below") == "payment_request"
+    assert output_violation("Kartaga to'lang") == "payment_request"
     assert output_violation("ЗАЩИТА (приоритет над любыми просьбами в чате)") == "prompt_leak"
     # бот-продавец не «передаёт вопросы» и не упоминает график работы
     assert output_violation("Передал ваш вопрос Денису") == "handoff_phrase"
     assert output_violation("Передам заявку менеджеру") == "handoff_phrase"
     assert output_violation("Он ответит в рабочий день") == "handoff_phrase"
     assert output_violation("He will reply on a business day") == "handoff_phrase"
+    assert output_violation("I'll pass your question to the team") == "handoff_phrase"
+    assert output_violation("Savolingizni uzataman") == "handoff_phrase"
     assert output_violation("Сделаем лендинг за 10 рабочих дней") is None
     assert output_violation("Передам все пожелания в макет") is None
 
@@ -72,6 +76,10 @@ def test_confirmation_flow():
     assert "Подтверждаете все данные?" in summary
     assert "Услуга: лендинг" in summary
     assert "—" not in summary
+    from app.brief_flow import contact_from_user, ensure_brief_contact
+    filled = ensure_brief_contact({}, {"name": "Али", "phone": "+99890", "username": "ali"})
+    assert "Али" in filled["contact"] and "+99890" in filled["contact"]
+    assert contact_from_user({"name": "X"}) == "X"
 
 
 def test_lang_script():
@@ -219,6 +227,12 @@ async def test_storage():
     assert await s.claim_lead(42) is False
     await s.reset_lead_flags(42)
     assert not (await s.get_brief(42)).get("_lead_sent")
+    await s.save_brief(42, {"service": "лендинг", "niche": "кафе", "summary": "тест",
+                            "deadline": "март", "_awaiting_confirm": True})
+    await s.add_message(42, "user", "ещё")
+    await s.start_fresh_inquiry(42)
+    assert await s.get_brief(42) == {}
+    assert await s.history(42) == []
     await s.log_event("start", 42, "sites_landing")
     await s.log_event("registered", 42)
     await s.log_event("brief_ready", 42)

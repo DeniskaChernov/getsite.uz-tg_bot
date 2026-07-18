@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+
 from app import texts
 from app.lang import fold_text
 
@@ -24,6 +26,40 @@ _EDIT_RE = re.compile(
     r"tuzat|noto'?g'?ri|notogri|yo'?q|yoq|"
     r"correct|wrong|change|edit|fix|no\b)",
 )
+
+
+def contact_from_user(user: dict | None) -> str:
+    """Контактная строка из профиля регистрации."""
+    if not user:
+        return ""
+    parts: list[str] = []
+    name = (user.get("name") or user.get("first_name") or "").strip()
+    if name:
+        parts.append(name)
+    phone = (user.get("phone") or "").strip()
+    if phone:
+        parts.append(phone)
+    username = (user.get("username") or "").strip()
+    if username:
+        parts.append("@" + username.lstrip("@"))
+    return ", ".join(parts)
+
+
+def ensure_brief_contact(brief: dict, user: dict | None) -> dict:
+    """Если extractor не дал контакт - подставляем из регистрации."""
+    if (brief.get("contact") or "").strip():
+        return brief
+    filled = contact_from_user(user)
+    if filled:
+        brief = {**brief, "contact": filled}
+    return brief
+
+
+def confirm_keyboard(lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=texts.CONFIRM_YES_BTN[lang], callback_data="brief_yes")],
+        [InlineKeyboardButton(text=texts.CONFIRM_EDIT_BTN[lang], callback_data="brief_edit")],
+    ])
 
 
 def format_brief_summary(brief: dict, lang: str) -> str:

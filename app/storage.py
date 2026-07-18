@@ -50,6 +50,7 @@ class BotStorage(Protocol):
     async def purge_old_history(self) -> int: ...
     async def claim_lead(self, user_id: int) -> bool: ...
     async def reset_lead_flags(self, user_id: int) -> None: ...
+    async def start_fresh_inquiry(self, user_id: int) -> None: ...
     async def list_followup_candidates(self, gaps_sec: tuple[int, ...] | list[int]) -> list[dict]: ...
     async def mark_followup_sent(self, user_id: int) -> None: ...
     async def ping(self) -> bool: ...
@@ -246,6 +247,16 @@ class PgStorage:
         brief.pop("_followup_count", None)
         brief.pop("_last_followup_at", None)
         await self.save_brief(user_id, brief)
+
+    async def start_fresh_inquiry(self, user_id: int) -> None:
+        """Новая заявка: чистый бриф и история, профиль (имя/телефон/язык) остаётся."""
+        async with self._pool.acquire() as conn:
+            await conn.execute("DELETE FROM bot_messages WHERE user_id = $1", user_id)
+            await conn.execute(
+                """INSERT INTO bot_briefs (user_id, data, updated_at) VALUES ($1, $2, $3)
+                   ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at""",
+                user_id, "{}", int(time.time()),
+            )
 
     async def create_lead(self, user_id: int, payload: str | None, summary: str,
                           snapshot: str | None = None) -> int:
@@ -571,6 +582,16 @@ class SqliteStorage:
         brief.pop("_followup_count", None)
         brief.pop("_last_followup_at", None)
         await self.save_brief(user_id, brief)
+
+    async def start_fresh_inquiry(self, user_id: int) -> None:
+        """Новая заявка: чистый бриф и история, профиль (имя/телефон/язык) остаётся."""
+        await self._db.execute("DELETE FROM bot_messages WHERE user_id=?", (user_id,))
+        await self._db.execute(
+            """INSERT INTO bot_briefs (user_id, data, updated_at) VALUES (?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at""",
+            (user_id, "{}", int(time.time())),
+        )
+        await self._db.commit()
 
     async def create_lead(self, user_id: int, payload: str | None, summary: str,
                           snapshot: str | None = None) -> int:
