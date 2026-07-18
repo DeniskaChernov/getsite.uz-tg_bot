@@ -151,6 +151,13 @@ async def test_storage():
     await s.set_lead_status(lead_id, "taken", 1)
     leads = await s.recent_leads()
     assert leads[0]["status"] == "taken"
+    # claim_lead: первый раз True, второй False
+    await s.save_brief(42, {"service": "лендинг", "niche": "кафе", "summary": "тест", "deadline": "март"})
+    assert await s.claim_lead(42) is True
+    assert (await s.get_brief(42)).get("_lead_sent") is True
+    assert await s.claim_lead(42) is False
+    await s.reset_lead_flags(42)
+    assert not (await s.get_brief(42)).get("_lead_sent")
     await s.log_event("start", 42, "sites_landing")
     stats = await s.stats()
     assert stats["starts_by_payload"]["sites_landing"] == 1

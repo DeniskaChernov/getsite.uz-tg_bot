@@ -1,4 +1,4 @@
-"""Карточка лида в админ-группу. Отправка — только детерминированный код."""
+"""Карточка лида в админ-группу. Отправка - только детерминированный код."""
 from __future__ import annotations
 
 import html
@@ -26,7 +26,7 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     brief = await storage.get_brief(user_id)
     payload = user.get("payload")
     service = brief.get("service") or resolve_payload(payload).name_ru
-    summary = brief.get("summary") or "—"
+    summary = brief.get("summary") or "-"
 
     lead_id = await storage.create_lead(user_id, payload, summary)
 
@@ -34,15 +34,17 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     started = await storage.first_message_at(user_id)
     started_str = (
         datetime.fromtimestamp(started, tz=timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
-        if started else "—"
+        if started else "-"
     )
 
+    contact_line = brief.get("contact") or "-"
     card = (
         f"🟢 Новый лид #{lead_id}\n"
         f"Услуга: {_esc(service)} (payload: {_esc(payload)})\n"
         f"Клиент: {_esc(user.get('name') or user.get('first_name'))} @{_esc(user.get('username'))} "
         f"(id {user_id}), язык {_esc(user.get('lang'))}\n"
         f"Телефон: {_esc(user.get('phone'))}\n"
+        f"Контакт из брифа: {_esc(contact_line)}\n"
         f"Ниша: {_esc(brief.get('niche'))}\n"
         f"Срок: {_esc(brief.get('deadline'))}\n"
         f"Бюджет: {_esc(brief.get('budget_hint'))}\n"
@@ -55,8 +57,9 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
         InlineKeyboardButton(text="Спам", callback_data=f"lead_spam:{lead_id}"),
     ]])
     try:
-        await bot.send_message(config.admin_chat_id, card, reply_markup=kb)
+        await bot.send_message(config.admin_chat_id, card, reply_markup=kb, parse_mode="HTML")
         await storage.log_event("lead_sent", user_id, str(lead_id))
+        return lead_id
     except Exception:
         log.error("Failed to send lead #%s to admin group", lead_id, exc_info=True)
-    return lead_id
+        return None

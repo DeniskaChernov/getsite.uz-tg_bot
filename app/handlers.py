@@ -122,8 +122,10 @@ async def cmd_start(message: Message, bot: Bot, command: CommandObject, storage:
     )
     await storage.log_event("start", message.from_user.id, svc.payload)
 
-    # Зарегистрированный клиент: помним его, здороваемся по имени и сразу к делу
+    # Зарегистрированный клиент: помним его, здороваемся по имени и сразу к делу.
+    # Сбрасываем флаги прошлого лида - можно начать новую заявку.
     if existing and existing.get("reg_state") == REG_DONE:
+        await storage.reset_lead_flags(message.from_user.id)
         prefix = texts.WELCOME_BACK[lang].format(name=existing.get("name") or existing.get("first_name") or "")
         await _service_greeting(bot, storage, message.from_user.id, message.chat.id, lang, prefix)
         return
@@ -186,6 +188,9 @@ async def cmd_lang(message: Message, command: CommandObject, storage: BotStorage
 @router.callback_query(F.data == "qb_contact")
 async def cb_contact(query: CallbackQuery, storage: BotStorage):
     user = await storage.get_user(query.from_user.id)
+    if user and user.get("muted"):
+        await query.answer()
+        return
     lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
     await query.answer()
     await query.message.answer(texts.CONTACT_REPLY[lang])
@@ -195,6 +200,9 @@ async def cb_contact(query: CallbackQuery, storage: BotStorage):
 @router.callback_query(F.data.in_({"qb_estimate", "qb_timeline"}))
 async def cb_quick(query: CallbackQuery, bot: Bot, storage: BotStorage):
     user = await storage.get_user(query.from_user.id)
+    if user and user.get("muted"):
+        await query.answer()
+        return
     lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
     await query.answer()
     user_text = texts.QUICK_BUTTON_AS_USER_TEXT[query.data][lang]
@@ -204,19 +212,42 @@ async def cb_quick(query: CallbackQuery, bot: Bot, storage: BotStorage):
 @router.callback_query(F.data == "brief_yes")
 async def cb_brief_yes(query: CallbackQuery, bot: Bot, storage: BotStorage):
     user = await storage.get_user(query.from_user.id)
+    if user and user.get("muted"):
+        await query.answer()
+        return
     lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
+    brief = await storage.get_brief(query.from_user.id)
+    # Старая кнопка после «Нужно поправить» или уже отправленный лид - игнор
+    if brief.get("_lead_sent") or not brief.get("_awaiting_confirm"):
+        await query.answer("Сначала сверим актуальные данные" if lang == "ru" else "OK")
+        try:
+            await query.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        return
     await query.answer()
+    try:
+        await query.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
     await _finalize_confirmed_lead(bot, storage, query.from_user.id, query.message.chat.id, lang)
 
 
 @router.callback_query(F.data == "brief_edit")
 async def cb_brief_edit(query: CallbackQuery, storage: BotStorage):
     user = await storage.get_user(query.from_user.id)
+    if user and user.get("muted"):
+        await query.answer()
+        return
     lang = user["lang"] if user else texts.normalize_lang(query.from_user.language_code)
     await query.answer()
     brief = await storage.get_brief(query.from_user.id)
     brief.pop("_awaiting_confirm", None)
     await storage.save_brief(query.from_user.id, brief)
+    try:
+        await query.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
     await query.message.answer(texts.BRIEF_EDIT_REPLY[lang])
     await storage.add_message(query.from_user.id, "assistant", texts.BRIEF_EDIT_REPLY[lang])
 
@@ -414,10 +445,19 @@ async def _finalize_confirmed_lead(bot: Bot, storage: BotStorage, user_id: int,
     if brief.get("_lead_sent"):
         await bot.send_message(chat_id, texts.LEAD_CONFIRM_USER[lang])
         return
-    brief["_lead_sent"] = True
-    brief.pop("_awaiting_confirm", None)
-    await storage.save_brief(user_id, brief)
+    # Атомарный claim: только один параллельный апдейт сможет поставить флаг
+    if not await storage.claim_lead(user_id):
+        await bot.send_message(chat_id, texts.LEAD_CONFIRM_USER[lang])
+        return
     await storage.log_event("brief_done", user_id)
-    await send_lead(bot, storage, user_id)
+    lead_id = await send_lead(bot, storage, user_id)
+    if lead_id is None:
+        # Откат, чтобы можно было повторить подтверждение
+        brief = await storage.get_brief(user_id)
+        brief.pop("_lead_sent", None)
+        brief["_awaiting_confirm"] = True
+        await storage.save_brief(user_id, brief)
+        await bot.send_message(chat_id, texts.LLM_FALLBACK_REPLY[lang])
+        return
     await bot.send_message(chat_id, texts.LEAD_CONFIRM_USER[lang])
     await storage.add_message(user_id, "assistant", texts.LEAD_CONFIRM_USER[lang])

@@ -60,7 +60,7 @@ async def generate_reply(user_id: int, history: list[dict[str, str]],
                 model=config.llm_model,
                 messages=messages,
                 max_tokens=600,
-                temperature=0.7,
+                temperature=0.8,
             ),
             timeout=LLM_TIMEOUT,
         )

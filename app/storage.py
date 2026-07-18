@@ -47,6 +47,8 @@ class BotStorage(Protocol):
     async def stats(self, days: int = 7) -> dict[str, Any]: ...
     async def forget_user(self, user_id: int) -> None: ...
     async def purge_old_history(self) -> int: ...
+    async def claim_lead(self, user_id: int) -> bool: ...
+    async def reset_lead_flags(self, user_id: int) -> None: ...
 
 
 def create_storage() -> BotStorage:
@@ -134,6 +136,7 @@ class PgStorage:
                    VALUES ($1, $2, $3, $4, $5, $6, $6)
                    ON CONFLICT (user_id) DO UPDATE SET
                      username = EXCLUDED.username, first_name = EXCLUDED.first_name,
+                     lang = EXCLUDED.lang,
                      payload = COALESCE(EXCLUDED.payload, bot_users.payload),
                      updated_at = EXCLUDED.updated_at""",
                 user_id, username, first_name, lang, payload, now,
@@ -201,6 +204,32 @@ class PgStorage:
                    ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at""",
                 user_id, json.dumps(data, ensure_ascii=False), int(time.time()),
             )
+
+    async def claim_lead(self, user_id: int) -> bool:
+        """Атомарно помечает бриф как отправленный. True - мы первые, False - уже занято."""
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    "SELECT data FROM bot_briefs WHERE user_id = $1 FOR UPDATE", user_id)
+                data = json.loads(row["data"]) if row else {}
+                if data.get("_lead_sent"):
+                    return False
+                data["_lead_sent"] = True
+                data.pop("_awaiting_confirm", None)
+                await conn.execute(
+                    """INSERT INTO bot_briefs (user_id, data, updated_at) VALUES ($1, $2, $3)
+                       ON CONFLICT (user_id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at""",
+                    user_id, json.dumps(data, ensure_ascii=False), int(time.time()),
+                )
+                return True
+
+    async def reset_lead_flags(self, user_id: int) -> None:
+        brief = await self.get_brief(user_id)
+        if not brief:
+            return
+        brief.pop("_lead_sent", None)
+        brief.pop("_awaiting_confirm", None)
+        await self.save_brief(user_id, brief)
 
     async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int:
         async with self._pool.acquire() as conn:
@@ -334,6 +363,7 @@ class SqliteStorage:
                VALUES (?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT(user_id) DO UPDATE SET
                  username=excluded.username, first_name=excluded.first_name,
+                 lang=excluded.lang,
                  payload=COALESCE(excluded.payload, bot_users.payload), updated_at=excluded.updated_at""",
             (user_id, username, first_name, lang, payload, now, now),
         )
@@ -405,6 +435,38 @@ class SqliteStorage:
             (user_id, json.dumps(data, ensure_ascii=False), int(time.time())),
         )
         await self._db.commit()
+
+    async def claim_lead(self, user_id: int) -> bool:
+        await self._db.execute("BEGIN IMMEDIATE")
+        try:
+            async with self._db.execute(
+                "SELECT data FROM bot_briefs WHERE user_id=?", (user_id,)
+            ) as cur:
+                row = await cur.fetchone()
+            data = json.loads(row["data"]) if row else {}
+            if data.get("_lead_sent"):
+                await self._db.execute("COMMIT")
+                return False
+            data["_lead_sent"] = True
+            data.pop("_awaiting_confirm", None)
+            await self._db.execute(
+                """INSERT INTO bot_briefs (user_id, data, updated_at) VALUES (?, ?, ?)
+                   ON CONFLICT(user_id) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at""",
+                (user_id, json.dumps(data, ensure_ascii=False), int(time.time())),
+            )
+            await self._db.execute("COMMIT")
+            return True
+        except Exception:
+            await self._db.execute("ROLLBACK")
+            raise
+
+    async def reset_lead_flags(self, user_id: int) -> None:
+        brief = await self.get_brief(user_id)
+        if not brief:
+            return
+        brief.pop("_lead_sent", None)
+        brief.pop("_awaiting_confirm", None)
+        await self.save_brief(user_id, brief)
 
     async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int:
         cur = await self._db.execute(
