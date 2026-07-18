@@ -49,7 +49,7 @@ class BotStorage(Protocol):
     async def purge_old_history(self) -> int: ...
     async def claim_lead(self, user_id: int) -> bool: ...
     async def reset_lead_flags(self, user_id: int) -> None: ...
-    async def list_followup_candidates(self, silent_after_sec: int, max_followups: int = 2) -> list[dict]: ...
+    async def list_followup_candidates(self, gaps_sec: tuple[int, ...] | list[int]) -> list[dict]: ...
     async def mark_followup_sent(self, user_id: int) -> None: ...
 
 
@@ -281,9 +281,14 @@ class PgStorage:
             for table in ("bot_messages", "bot_briefs", "bot_leads", "bot_events", "bot_users"):
                 await conn.execute(f"DELETE FROM {table} WHERE user_id = $1", user_id)
 
-    async def list_followup_candidates(self, silent_after_sec: int, max_followups: int = 2) -> list[dict]:
-        """Клиенты, у которых последнее сообщение - от бота, и тишина дольше silent_after_sec."""
-        cutoff = int(time.time()) - silent_after_sec
+    async def list_followup_candidates(self, gaps_sec: tuple[int, ...] | list[int]) -> list[dict]:
+        """Клиенты, у которых последнее сообщение - от бота; интервалы - gaps_sec[count]."""
+        gaps = list(gaps_sec)
+        if not gaps:
+            return []
+        max_followups = len(gaps)
+        cutoff = int(time.time()) - gaps[0]
+        now = int(time.time())
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
                 """
@@ -307,10 +312,13 @@ class PgStorage:
             count = int(brief.get("_followup_count") or 0)
             if count >= max_followups:
                 continue
-            last_fu = int(brief.get("_last_followup_at") or 0)
-            # Второе напоминание - не раньше чем через 24ч после первого
-            if count >= 1 and int(time.time()) - last_fu < 86400:
-                continue
+            if count == 0:
+                # уже отфильтровано по тишине gaps[0] от последнего ответа бота
+                pass
+            else:
+                last_fu = int(brief.get("_last_followup_at") or 0)
+                if now - last_fu < gaps[count]:
+                    continue
             out.append({
                 "user_id": r["user_id"],
                 "lang": r["lang"] or "ru",
@@ -570,8 +578,13 @@ class SqliteStorage:
             await self._db.execute(f"DELETE FROM {table} WHERE user_id=?", (user_id,))
         await self._db.commit()
 
-    async def list_followup_candidates(self, silent_after_sec: int, max_followups: int = 2) -> list[dict]:
-        cutoff = int(time.time()) - silent_after_sec
+    async def list_followup_candidates(self, gaps_sec: tuple[int, ...] | list[int]) -> list[dict]:
+        gaps = list(gaps_sec)
+        if not gaps:
+            return []
+        max_followups = len(gaps)
+        cutoff = int(time.time()) - gaps[0]
+        now = int(time.time())
         async with self._db.execute(
             """
             SELECT u.user_id, u.lang, u.name, b.data AS brief_data, m.role AS last_role, m.created_at AS last_at
@@ -595,9 +608,10 @@ class SqliteStorage:
             count = int(brief.get("_followup_count") or 0)
             if count >= max_followups:
                 continue
-            last_fu = int(brief.get("_last_followup_at") or 0)
-            if count >= 1 and int(time.time()) - last_fu < 86400:
-                continue
+            if count >= 1:
+                last_fu = int(brief.get("_last_followup_at") or 0)
+                if now - last_fu < gaps[count]:
+                    continue
             out.append({
                 "user_id": r["user_id"],
                 "lang": r["lang"] or "ru",

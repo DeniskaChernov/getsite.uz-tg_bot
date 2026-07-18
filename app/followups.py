@@ -1,7 +1,7 @@
 """Мягкие follow-up сообщения, если клиент замолчал после ответа бота.
 
 Telegram разрешает писать первым, если клиент уже нажал /start.
-Не более 2 напоминаний: первое через ~4 часа тишины, второе не раньше чем через 24ч после первого.
+Расписание: 1-е через 6ч тишины, 2-е через 24ч после 1-го, 3-е через 48ч после 2-го.
 """
 from __future__ import annotations
 
@@ -16,11 +16,11 @@ from app.storage import BotStorage
 
 log = logging.getLogger(__name__)
 
-# Первое напоминание после 4 часов молчания
-FOLLOWUP_SILENT_SEC = 4 * 3600
+# Интервалы до следующего напоминания (по номеру: 0 → 6ч, 1 → 24ч, 2 → 48ч)
+FOLLOWUP_GAPS_SEC = (6 * 3600, 24 * 3600, 48 * 3600)
+MAX_FOLLOWUPS = len(FOLLOWUP_GAPS_SEC)
 # Как часто проверять кандидатов
 FOLLOWUP_POLL_SEC = 15 * 60
-MAX_FOLLOWUPS = 2
 
 
 def followup_text(lang: str, name: str | None, awaiting_confirm: bool, n: int) -> str:
@@ -30,14 +30,16 @@ def followup_text(lang: str, name: str | None, awaiting_confirm: bool, n: int) -
         templates = texts.FOLLOWUP_CONFIRM
     elif n == 0:
         templates = texts.FOLLOWUP_FIRST
-    else:
+    elif n == 1:
         templates = texts.FOLLOWUP_SECOND
+    else:
+        templates = texts.FOLLOWUP_THIRD
     msg = templates.get(lang) or templates["ru"]
     return msg.format(name_part=name_part)
 
 
 async def run_followups_once(bot: Bot, storage: BotStorage) -> int:
-    candidates = await storage.list_followup_candidates(FOLLOWUP_SILENT_SEC, MAX_FOLLOWUPS)
+    candidates = await storage.list_followup_candidates(FOLLOWUP_GAPS_SEC)
     sent = 0
     for c in candidates:
         lang = c["lang"] if c["lang"] in ("ru", "uz", "en") else "ru"

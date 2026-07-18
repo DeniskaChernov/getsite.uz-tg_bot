@@ -274,6 +274,12 @@ FOLLOWUP_SECOND = {
     "en": "Just checking in: if the project is still relevant, write and I'll outline the next steps. If not - no worries.",
 }
 
+FOLLOWUP_THIRD = {
+    "ru": "Последнее короткое сообщение от меня: если задача ещё в силе - я на связи и помогу сориентироваться. Если планы изменились - всё в порядке.",
+    "uz": "Oxirgi qisqa xabarim: vazifa hali dolzarb bo'lsa - men shu yerdaman va yo'nalish beraman. Rejalar o'zgargan bo'lsa - hammasi joyida.",
+    "en": "One last short note from me: if the task is still on - I'm here to help you get oriented. If plans changed - that's perfectly fine.",
+}
+
 FOLLOWUP_CONFIRM = {
     "ru": "Напомню: выше сводка по вашим данным. Если всё верно - подтвердите, пожалуйста. Если нужно поправить - напишите что именно.",
     "uz": "Eslatma: yuqorida ma'lumotlaringiz xulosasi bor. Hammasi to'g'ri bo'lsa - tasdiqlang. Tuzatish kerak bo'lsa - nima ekanini yozing.",
