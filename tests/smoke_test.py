@@ -168,10 +168,13 @@ async def test_storage():
     assert len(await s.history(42)) == 2
     await s.save_brief(42, {"niche": "кафе"})
     assert (await s.get_brief(42))["niche"] == "кафе"
-    lead_id = await s.create_lead(42, "sites_landing", "Тестовый лид")
+    lead_id = await s.create_lead(42, "sites_landing", "Тестовый лид",
+                                  snapshot='{"user":{"user_id":42},"brief":{"niche":"кафе"}}')
     await s.set_lead_status(lead_id, "taken", 1)
     leads = await s.recent_leads()
     assert leads[0]["status"] == "taken"
+    assert leads[0].get("snapshot") and "кафе" in leads[0]["snapshot"]
+    assert await s.ping() is True
     # claim_lead: первый раз True, второй False
     await s.save_brief(42, {"service": "лендинг", "niche": "кафе", "summary": "тест", "deadline": "март"})
     assert await s.claim_lead(42) is True

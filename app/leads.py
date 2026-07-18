@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -19,6 +20,26 @@ def _esc(value: str | None) -> str:
     return html.escape(str(value) if value else "-")
 
 
+def build_lead_snapshot(user: dict, brief: dict, msg_count: int, started_at: int | None) -> str:
+    """Полный снимок заявки для bot_leads.snapshot (JSON) - удобно для CRM позже."""
+    public_brief = {k: v for k, v in brief.items() if v and not str(k).startswith("_")}
+    return json.dumps(
+        {
+            "user": {
+                "user_id": user.get("user_id"),
+                "name": user.get("name") or user.get("first_name"),
+                "username": user.get("username"),
+                "phone": user.get("phone"),
+                "lang": user.get("lang"),
+                "payload": user.get("payload"),
+            },
+            "brief": public_brief,
+            "dialog": {"message_count": msg_count, "started_at": started_at},
+        },
+        ensure_ascii=False,
+    )
+
+
 async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     user = await storage.get_user(user_id)
     if not user:
@@ -28,10 +49,11 @@ async def send_lead(bot: Bot, storage: BotStorage, user_id: int) -> int | None:
     service = brief.get("service") or resolve_payload(payload).name_ru
     summary = brief.get("summary") or "-"
 
-    lead_id = await storage.create_lead(user_id, payload, summary)
-
     msg_count = await storage.message_count(user_id)
     started = await storage.first_message_at(user_id)
+    snapshot = build_lead_snapshot(user, brief, msg_count, started)
+    lead_id = await storage.create_lead(user_id, payload, summary, snapshot=snapshot)
+
     started_str = (
         datetime.fromtimestamp(started, tz=timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
         if started else "-"

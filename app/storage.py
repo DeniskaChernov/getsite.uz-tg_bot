@@ -40,7 +40,8 @@ class BotStorage(Protocol):
     async def first_message_at(self, user_id: int) -> int | None: ...
     async def get_brief(self, user_id: int) -> dict[str, Any]: ...
     async def save_brief(self, user_id: int, data: dict[str, Any]) -> None: ...
-    async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int: ...
+    async def create_lead(self, user_id: int, payload: str | None, summary: str,
+                          snapshot: str | None = None) -> int: ...
     async def set_lead_status(self, lead_id: int, status: str, taken_by: int | None = None) -> None: ...
     async def recent_leads(self, limit: int = 10) -> list[dict[str, Any]]: ...
     async def log_event(self, kind: str, user_id: int | None = None, meta: str | None = None) -> None: ...
@@ -51,6 +52,7 @@ class BotStorage(Protocol):
     async def reset_lead_flags(self, user_id: int) -> None: ...
     async def list_followup_candidates(self, gaps_sec: tuple[int, ...] | list[int]) -> list[dict]: ...
     async def mark_followup_sent(self, user_id: int) -> None: ...
+    async def ping(self) -> bool: ...
 
 
 def create_storage() -> BotStorage:
@@ -99,6 +101,7 @@ CREATE TABLE IF NOT EXISTS bot_leads (
     user_id     BIGINT NOT NULL,
     payload     TEXT,
     summary     TEXT NOT NULL,
+    snapshot    TEXT,
     status      TEXT NOT NULL DEFAULT 'new',
     taken_by    BIGINT,
     created_at  BIGINT NOT NULL
@@ -124,10 +127,19 @@ class PgStorage:
         self._pool = await asyncpg.create_pool(self._dsn, min_size=1, max_size=5)
         async with self._pool.acquire() as conn:
             await conn.execute(_PG_SCHEMA)
+            await conn.execute("ALTER TABLE bot_leads ADD COLUMN IF NOT EXISTS snapshot TEXT")
 
     async def close(self) -> None:
         if self._pool:
             await self._pool.close()
+
+    async def ping(self) -> bool:
+        try:
+            async with self._pool.acquire() as conn:
+                await conn.fetchval("SELECT 1")
+            return True
+        except Exception:
+            return False
 
     async def upsert_user(self, user_id: int, username: str | None, first_name: str | None,
                           lang: str, payload: str | None = None) -> None:
@@ -235,11 +247,13 @@ class PgStorage:
         brief.pop("_last_followup_at", None)
         await self.save_brief(user_id, brief)
 
-    async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int:
+    async def create_lead(self, user_id: int, payload: str | None, summary: str,
+                          snapshot: str | None = None) -> int:
         async with self._pool.acquire() as conn:
             return await conn.fetchval(
-                "INSERT INTO bot_leads (user_id, payload, summary, created_at) VALUES ($1, $2, $3, $4) RETURNING id",
-                user_id, payload, summary, int(time.time()),
+                "INSERT INTO bot_leads (user_id, payload, summary, snapshot, created_at) "
+                "VALUES ($1, $2, $3, $4, $5) RETURNING id",
+                user_id, payload, summary, snapshot, int(time.time()),
             )
 
     async def set_lead_status(self, lead_id: int, status: str, taken_by: int | None = None) -> None:
@@ -381,6 +395,7 @@ CREATE TABLE IF NOT EXISTS bot_leads (
     user_id     INTEGER NOT NULL,
     payload     TEXT,
     summary     TEXT NOT NULL,
+    snapshot    TEXT,
     status      TEXT NOT NULL DEFAULT 'new',
     taken_by    INTEGER,
     created_at  INTEGER NOT NULL
@@ -407,11 +422,23 @@ class SqliteStorage:
         self._db = await aiosqlite.connect(self._path)
         self._db.row_factory = aiosqlite.Row
         await self._db.executescript(_SQLITE_SCHEMA)
+        try:
+            await self._db.execute("ALTER TABLE bot_leads ADD COLUMN snapshot TEXT")
+        except Exception:
+            pass  # колонка уже есть
         await self._db.commit()
 
     async def close(self) -> None:
         if self._db:
             await self._db.close()
+
+    async def ping(self) -> bool:
+        try:
+            async with self._db.execute("SELECT 1") as cur:
+                await cur.fetchone()
+            return True
+        except Exception:
+            return False
 
     async def upsert_user(self, user_id: int, username: str | None, first_name: str | None,
                           lang: str, payload: str | None = None) -> None:
@@ -528,10 +555,11 @@ class SqliteStorage:
         brief.pop("_last_followup_at", None)
         await self.save_brief(user_id, brief)
 
-    async def create_lead(self, user_id: int, payload: str | None, summary: str) -> int:
+    async def create_lead(self, user_id: int, payload: str | None, summary: str,
+                          snapshot: str | None = None) -> int:
         cur = await self._db.execute(
-            "INSERT INTO bot_leads (user_id, payload, summary, created_at) VALUES (?, ?, ?, ?)",
-            (user_id, payload, summary, int(time.time())),
+            "INSERT INTO bot_leads (user_id, payload, summary, snapshot, created_at) VALUES (?, ?, ?, ?, ?)",
+            (user_id, payload, summary, snapshot, int(time.time())),
         )
         await self._db.commit()
         return cur.lastrowid

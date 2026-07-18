@@ -332,15 +332,18 @@ async def on_text(message: Message, bot: Bot, storage: BotStorage):
     # --- обычный диалог ---
 
     if _FORGET_RE.search(text):
+        uid = message.from_user.id
+        uname = message.from_user.username or "-"
+        await storage.forget_user(uid)
+        await storage.log_event("forgotten", uid)
         await message.answer(texts.FORGET_CONFIRM_USER[lang])
         try:
             await bot.send_message(
                 config.admin_chat_id,
-                f"🗑 Запрос на удаление данных от id {message.from_user.id} "
-                f"(@{message.from_user.username or '-'}). Выполните: /forget {message.from_user.id}",
+                f"🗑 Данные удалены автоматически: id {uid} (@{uname})",
             )
         except Exception:
-            log.error("Failed to notify admins about forget request", exc_info=True)
+            log.error("Failed to notify admins about forget", exc_info=True)
         return
 
     if not limiter.check_user(message.from_user.id):

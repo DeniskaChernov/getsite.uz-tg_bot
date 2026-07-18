@@ -186,9 +186,9 @@ LANG_CHANGED = {
 }
 
 FORGET_CONFIRM_USER = {
-    "ru": "Принял запрос на удаление ваших данных - удалим в ближайшее время.",
-    "uz": "Ma'lumotlaringizni o'chirish so'rovini qabul qildim - tez orada o'chiramiz.",
-    "en": "Your data deletion request has been received - we'll remove it shortly.",
+    "ru": "Готово. Ваши данные удалены из бота. Если снова напишете /start - начнём с чистого листа.",
+    "uz": "Tayyor. Ma'lumotlaringiz botdan o'chirildi. Yana /start yozsangiz - yangidan boshlaymiz.",
+    "en": "Done. Your data has been removed from the bot. If you send /start again - we'll start fresh.",
 }
 
 # Сводка брифа перед отправкой лида - клиент должен явно подтвердить

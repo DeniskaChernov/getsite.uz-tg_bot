@@ -41,12 +41,19 @@ async def daily_maintenance(storage: BotStorage) -> None:
 
 async def health(request: web.Request) -> web.Response:
     bot: Bot = request.app["bot"]
+    storage: BotStorage = request.app["storage"]
     try:
         info = await bot.get_webhook_info()
-        ok = not info.last_error_date
+        webhook_ok = not info.last_error_date
+        db_ok = await storage.ping()
+        ok = webhook_ok and db_ok
         return web.json_response(
-            {"status": "ok" if ok else "webhook_error",
-             "pending": info.pending_update_count},
+            {
+                "status": "ok" if ok else "degraded",
+                "webhook_ok": webhook_ok,
+                "db_ok": db_ok,
+                "pending": info.pending_update_count,
+            },
             status=200 if ok else 503,
         )
     except Exception:
@@ -77,6 +84,7 @@ async def run_webhook(bot: Bot, dp: Dispatcher, storage: BotStorage) -> None:
 
     app = web.Application(client_max_size=MAX_BODY_SIZE)
     app["bot"] = bot
+    app["storage"] = storage
     # Проверка X-Telegram-Bot-Api-Secret-Token: несовпадение → 401/403 внутри handler'а
     SimpleRequestHandler(dispatcher=dp, bot=bot, secret_token=config.webhook_secret).register(
         app, path=config.webhook_path,
