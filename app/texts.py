@@ -119,9 +119,9 @@ def start_with_service(svc: Service, lang: Lang) -> str:
 
 
 QUICK_BUTTONS = {
-    "ru": [("Рассчитать под мою задачу", "qb_estimate"), ("Сроки", "qb_timeline"), ("Связаться с Денисом", "qb_contact")],
-    "uz": [("Vazifamga mos hisoblash", "qb_estimate"), ("Muddatlar", "qb_timeline"), ("Denis bilan bog'lanish", "qb_contact")],
-    "en": [("Estimate my project", "qb_estimate"), ("Timeline", "qb_timeline"), ("Contact Denis", "qb_contact")],
+    "ru": [("Рассчитать под мою задачу", "qb_estimate"), ("Сроки", "qb_timeline"), ("Связаться с менеджером", "qb_contact")],
+    "uz": [("Vazifamga mos hisoblash", "qb_estimate"), ("Muddatlar", "qb_timeline"), ("Menejer bilan bog'lanish", "qb_contact")],
+    "en": [("Estimate my project", "qb_estimate"), ("Timeline", "qb_timeline"), ("Contact a manager", "qb_contact")],
 }
 
 QUICK_BUTTON_AS_USER_TEXT = {
@@ -130,15 +130,15 @@ QUICK_BUTTON_AS_USER_TEXT = {
 }
 
 CONTACT_REPLY = {
-    "ru": f"Денис на связи: {CONTACT_TG}, {CONTACT_PHONE}. А пока расскажите, что за задача - помогу прикинуть объём и цену прямо здесь.",
-    "uz": f"Denis bilan bog'lanish: {CONTACT_TG}, {CONTACT_PHONE}. Ungacha vazifangizni aytib bering - hajm va narxni shu yerda chamalab beraman.",
-    "en": f"You can reach Denis directly: {CONTACT_TG}, {CONTACT_PHONE}. Meanwhile, tell me about your task - I'll help estimate the scope and price right here.",
+    "ru": f"Менеджер на связи: {CONTACT_TG}, {CONTACT_PHONE}. А пока расскажите, что за задача - помогу прикинуть объём и цену прямо здесь.",
+    "uz": f"Menejer bilan bog'lanish: {CONTACT_TG}, {CONTACT_PHONE}. Ungacha vazifangizni aytib bering - hajm va narxni shu yerda chamalab beraman.",
+    "en": f"You can reach a manager directly: {CONTACT_TG}, {CONTACT_PHONE}. Meanwhile, tell me about your task - I'll help estimate the scope and price right here.",
 }
 
 MEDIA_REPLY = {
-    "ru": "Давайте пока текстом - файлы и примеры вы сможете показать уже Денису.",
-    "uz": "Hozircha matn bilan yozing - fayl va namunalarni keyin Denisga ko'rsatasiz.",
-    "en": "Let's stick to text for now - you can share files and examples with Denis later.",
+    "ru": "Давайте пока текстом - файлы и примеры вы сможете показать уже менеджеру.",
+    "uz": "Hozircha matn bilan yozing - fayl va namunalarni keyin menejerga ko'rsatasiz.",
+    "en": "Let's stick to text for now - you can share files and examples with a manager later.",
 }
 
 TOO_LONG_REPLY = {
@@ -168,13 +168,13 @@ LLM_FALLBACK_REPLY = {
 FILTERED_REPLY = LLM_FALLBACK_REPLY
 
 HELP_REPLY = {
-    "ru": "Помогу выбрать услугу getsite, отвечу про цены и соберу короткий бриф для Дениса.\n\n"
+    "ru": "Помогу выбрать услугу getsite, отвечу про цены и соберу короткий бриф для менеджера.\n\n"
           "/start - начать заново\n/lang ru|uz|en - сменить язык\n\n"
           f"Контакты: {CONTACT_TG}, {CONTACT_PHONE}, https://getsite.uz",
-    "uz": "getsite xizmatini tanlashga yordam beraman, narxlar haqida javob beraman va Denis uchun qisqa brif tayyorlayman.\n\n"
+    "uz": "getsite xizmatini tanlashga yordam beraman, narxlar haqida javob beraman va menejer uchun qisqa brif tayyorlayman.\n\n"
           "/start - qaytadan boshlash\n/lang ru|uz|en - tilni o'zgartirish\n\n"
           f"Kontaktlar: {CONTACT_TG}, {CONTACT_PHONE}, https://getsite.uz",
-    "en": "I'll help you choose a getsite service, answer pricing questions, and prepare a short brief for Denis.\n\n"
+    "en": "I'll help you choose a getsite service, answer pricing questions, and prepare a short brief for a manager.\n\n"
           "/start - start over\n/lang ru|uz|en - switch language\n\n"
           f"Contacts: {CONTACT_TG}, {CONTACT_PHONE}, https://getsite.uz",
 }
@@ -247,12 +247,12 @@ CONFIRM_EDIT_BTN = {
 }
 
 LEAD_CONFIRM_USER = {
-    "ru": f"Спасибо, данные принял. Денис свяжется с вами в ближайшее время по смете и плану работ. "
+    "ru": f"Спасибо, данные принял. Передал менеджеру - он свяжется с вами в ближайшее время по смете и плану работ. "
           f"Если удобнее сразу: {CONTACT_PHONE}. Я на связи, если появятся вопросы.",
-    "uz": f"Rahmat, ma'lumotlarni qabul qildim. Denis smeta va ish rejasi bo'yicha tez orada siz bilan bog'lanadi. "
+    "uz": f"Rahmat, ma'lumotlarni qabul qildim. Menejerga uzatdim - u smeta va ish rejasi bo'yicha tez orada siz bilan bog'lanadi. "
           f"Darhol qulayroq bo'lsa: {CONTACT_PHONE}. Savollar bo'lsa, men shu yerdaman.",
-    "en": f"Thank you, I've recorded the details. Denis will contact you shortly about the quote and work plan. "
-          f"If it's easier to reach him now: {CONTACT_PHONE}. I'm here if you have more questions.",
+    "en": f"Thank you, I've recorded the details. I've passed this to a manager - they'll contact you shortly about the quote and work plan. "
+          f"If it's easier to reach them now: {CONTACT_PHONE}. I'm here if you have more questions.",
 }
 
 BRIEF_EDIT_REPLY = {

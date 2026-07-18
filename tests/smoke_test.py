@@ -80,6 +80,19 @@ def test_polish():
     assert polish_reply("## Заголовок\nтекст") == "Заголовок\nтекст"
     assert polish_reply("а\n\n\n\nб") == "а\n\nб"
     assert "—" not in polish_reply("тире — везде — всегда")
+    assert "менеджеру" in polish_reply("Передам Денису завтра")
+    assert "Denis" not in polish_reply("Ask Denis please")
+    assert "manager" in polish_reply("Ask Denis please")
+
+
+def test_no_denis_in_templates():
+    for d in (texts.CONTACT_REPLY, texts.MEDIA_REPLY, texts.HELP_REPLY, texts.LEAD_CONFIRM_USER):
+        for lang, s in d.items():
+            assert "Денис" not in s and "Denis" not in s, f"Denis in [{lang}]: {s[:50]}"
+    for lang, buttons in texts.QUICK_BUTTONS.items():
+        for label, _ in buttons:
+            assert "Денис" not in label and "Denis" not in label
+    assert "Передал менеджеру" in texts.LEAD_CONFIRM_USER["ru"]
 
 
 def test_no_em_dash_in_templates():
@@ -182,6 +195,7 @@ def main():
     test_confirmation_flow()
     test_no_handoff_in_templates()
     test_polish()
+    test_no_denis_in_templates()
     test_no_em_dash_in_templates()
     test_texts()
     test_prompt()

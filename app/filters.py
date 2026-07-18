@@ -36,6 +36,12 @@ def polish_reply(text: str) -> str:
     text = text.replace("—", "-").replace("–", "-")
     text = text.replace("**", "").replace("__", "")
     text = _MD_HEADER_RE.sub("", text)
+    # Клиенту не светим имя сотрудника - только "менеджер"
+    text = re.sub(r"\bДенису\b", "менеджеру", text)
+    text = re.sub(r"\bДениса\b", "менеджера", text)
+    text = re.sub(r"\bДенисом\b", "менеджером", text)
+    text = re.sub(r"\bДенис\b", "менеджер", text)
+    text = re.sub(r"\bDenis\b", "manager", text, flags=re.IGNORECASE)
     # схлопываем 3+ пустых строки до одной пустой
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
